@@ -212,20 +212,21 @@ public class TicketsEndpointsTests
                 "The printer doesn't work",
                 TicketPriority.Normal);
 
+            ticket.AssignUser(user);
+
             await context.Tickets.AddAsync(ticket);
             await context.Users.AddAsync(user);
             await context.SaveChangesAsync();
+
             ticketId = ticket.Id;
             userId = user.Id;
-
-            var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{userId}", null);
-            // not checking if the put worked because we have another test for this
         }
 
         var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{userId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
 
 
@@ -261,6 +262,8 @@ public class TicketsEndpointsTests
                 "The printer doesn't work",
                 TicketPriority.Normal);
 
+            ticket.AssignUser(user1);
+
             await context.Tickets.AddAsync(ticket);
             await context.Users.AddAsync(user1);
             await context.Users.AddAsync(user2);
@@ -269,18 +272,47 @@ public class TicketsEndpointsTests
             ticketId = ticket.Id;
             user1Id = user1.Id;
             user2Id = user2.Id;
-
-            var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{user1Id}", null);
         }
 
         var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{user2Id}");
         Assert.Equal(HttpStatusCode.Conflict, deleteResponse.StatusCode);
+
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+
         Assert.NotNull(ticketFromDb);
         Assert.NotNull(ticketFromDb.AssignedUser);
         Assert.Equal(user1Id, ticketFromDb.AssignedUser.Id);
     }
+
+    [Fact]
+    public async Task UnassignUser_WhenTicketHasNoAssignedUser_ShouldReturnConflict()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        int ticketId;
+        Ticket ticket;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+
+            ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+        }
+
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/999");
+        Assert.Equal(HttpStatusCode.Conflict, deleteResponse.StatusCode);
+    }
+
 
     [Fact]
     public async Task UnassignUser_WithUnknownTicket_ShouldReturnNotFound()
@@ -288,21 +320,7 @@ public class TicketsEndpointsTests
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
 
-        int userId;
-        using (var scope = factory.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            var user = new User(
-                "Thomas",
-                "Banana",
-                "email@domain.com",
-                UserRole.Technician);
-            await context.Users.AddAsync(user);
-            await context.SaveChangesAsync();
-            userId = user.Id;
-        }
-
-        var deleteResponse = await client.DeleteAsync($"/api/tickets/999/assignee/{userId}");
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/999/assignee/999");
         Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
     }
 }

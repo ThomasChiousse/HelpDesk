@@ -30,6 +30,9 @@ public class GlobalExceptionHandler : IExceptionHandler
             AssigneeMismatchException =>
                 StatusCodes.Status409Conflict,
 
+            TicketHasNoAssigneeException =>
+                StatusCodes.Status409Conflict,
+
             _ =>
                 StatusCodes.Status500InternalServerError
         };

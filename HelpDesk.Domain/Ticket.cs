@@ -86,8 +86,7 @@ namespace HelpDesk.Domain
         public void UnassignUser(int userId)
         {
             if (AssignedUser is null)
-                throw new InvalidOperationException(
-                    "The ticket has no assigned user.");
+                throw new TicketHasNoAssigneeException(Id);
 
             if (AssignedUser.Id != userId)
                 throw new AssigneeMismatchException(userId, AssignedUser.Id);
