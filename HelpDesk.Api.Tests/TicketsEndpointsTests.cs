@@ -222,7 +222,7 @@ public class TicketsEndpointsTests
             // not checking if the put worked because we have another test for this
         }
 
-        var deleteResponse = await client.DeleteAsync($"api/tickets/{ticketId}/assignee/{userId}");
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{userId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
@@ -273,7 +273,7 @@ public class TicketsEndpointsTests
             var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{user1Id}", null);
         }
 
-        var deleteResponse = await client.DeleteAsync($"api/tickets/{ticketId}/assignee/{user2Id}");
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{user2Id}");
         Assert.Equal(HttpStatusCode.Conflict, deleteResponse.StatusCode);
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
@@ -302,7 +302,7 @@ public class TicketsEndpointsTests
             userId = user.Id;
         }
 
-        var deleteResponse = await client.DeleteAsync($"api/tickets/999/assignee/{userId}");
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/999/assignee/{userId}");
         Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
     }
 }
