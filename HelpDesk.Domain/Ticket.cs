@@ -1,4 +1,6 @@
-﻿namespace HelpDesk.Domain
+﻿using HelpDesk.Domain.Exceptions;
+
+namespace HelpDesk.Domain
 {
 
     public class Ticket
@@ -88,8 +90,7 @@
                     "The ticket has no assigned user.");
 
             if (AssignedUser.Id != userId)
-                throw new InvalidOperationException(
-                    $"User {userId} is not assigned to this ticket.");
+                throw new AssigneeMismatchException(userId, AssignedUser.Id);
             AssignedUser = null;
         }
 

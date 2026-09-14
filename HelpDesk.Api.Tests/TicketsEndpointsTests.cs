@@ -234,7 +234,7 @@ public class TicketsEndpointsTests
     }
 
     [Fact]
-    public async Task UnassignUser_WhenUserIsNotAssigned_ShouldReturn409Conflict()
+    public async Task UnassignUser_WhenUserIsNotAssigned_ShouldReturnConflict()
     {
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
@@ -272,5 +272,37 @@ public class TicketsEndpointsTests
 
             var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{user1Id}", null);
         }
+
+        var deleteResponse = await client.DeleteAsync($"api/tickets/{ticketId}/assignee/{user2Id}");
+        Assert.Equal(HttpStatusCode.Conflict, deleteResponse.StatusCode);
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.NotNull(ticketFromDb.AssignedUser);
+        Assert.Equal(user1Id, ticketFromDb.AssignedUser.Id);
+    }
+
+    [Fact]
+    public async Task UnassignUser_WithUnknownTicket_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        int userId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var user = new User(
+                "Thomas",
+                "Banana",
+                "email@domain.com",
+                UserRole.Technician);
+            await context.Users.AddAsync(user);
+            await context.SaveChangesAsync();
+            userId = user.Id;
+        }
+
+        var deleteResponse = await client.DeleteAsync($"api/tickets/999/assignee/{userId}");
+        Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
     }
 }
