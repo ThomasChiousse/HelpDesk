@@ -75,6 +75,15 @@ public class Ticket
         Description = description;
     }
 
+    public void SetPriority(TicketPriority priority)
+    {
+        if (!Enum.IsDefined(priority))
+            throw new ArgumentException(
+                "Unknown ticket priority.",
+                nameof(priority));
+        Priority = priority;
+    }
+
     public void AssignUser(User user)
     {
         ArgumentNullException.ThrowIfNull(user);

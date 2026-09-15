@@ -14,14 +14,16 @@ namespace HelpDesk.Api.Controllers
         private readonly TicketAssignmentService _ticketAssignmentService;
         private readonly TicketCommentService _ticketCommentService;
         private readonly TicketStatusService _ticketStatusService;
-
-        public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService, TicketCommentService ticketCommentService, TicketStatusService ticketStatusService)
+        private readonly TicketUpdateService _ticketUpdateService;
+        public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService,
+            TicketCommentService ticketCommentService, TicketStatusService ticketStatusService, TicketUpdateService ticketUpdateService)
         {
             _ticketQueryService = ticketQueryService;
             _ticketCreationService = ticketCreationService;
             _ticketAssignmentService = ticketAssignmentService;
             _ticketCommentService = ticketCommentService;
             _ticketStatusService = ticketStatusService;
+            _ticketUpdateService = ticketUpdateService;
         }
 
         [HttpGet("{id:int}")]
@@ -95,6 +97,33 @@ namespace HelpDesk.Api.Controllers
         {
             var status = await _ticketStatusService.AdvanceStatusAsync(ticketId, cancellationToken);
             return Ok(new TicketStatusResponse(status.ToString()));
+        }
+
+        [HttpPut("{ticketId:int}")]
+        public async Task<IActionResult> Update(int ticketId, UpdateTicketRequest request, CancellationToken cancellationToken = default)
+        {
+            if (!Enum.TryParse<TicketPriority>(request.Priority, ignoreCase: true, out var priority)
+                || !Enum.IsDefined(priority))
+            {
+                ModelState.AddModelError(nameof(request.Priority), "Unknown ticket priority.");
+
+                return ValidationProblem(ModelState);
+            }
+
+            var ticket = await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
+            var ticketDetailsResponse = new TicketDetailsResponse(
+                ticket.Id,
+                ticket.Title,
+                ticket.Description,
+                ticket.Priority.ToString(),
+                ticket.Status.ToString(),
+                ticket.CreationDate,
+                ticket.AssignedUser is null ? null : new UserResponse(ticket.AssignedUser.Id, ticket.AssignedUser.Firstname, ticket.AssignedUser.Lastname),
+                ticket.Comments.Select(
+                    c => new CommentResponse(
+                        c.Id, c.Content, c.CreationDate, new UserResponse(
+                            c.Author.Id, c.Author.Firstname, c.Author.Lastname))).ToList());
+            return Ok(ticketDetailsResponse);
         }
     }
 }

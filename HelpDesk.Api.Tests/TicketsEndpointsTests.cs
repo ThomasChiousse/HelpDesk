@@ -538,4 +538,84 @@ public class TicketsEndpointsTests
         var patchResponse = await client.PatchAsync($"/api/tickets/999/status", null);
         Assert.Equal(HttpStatusCode.NotFound, patchResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task UpdateTicket_WithValidRequest_ShouldUpdateTicket()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.Equal("New Title", ticketFromDb.Title);
+        Assert.Equal("New Description", ticketFromDb.Description);
+        Assert.Equal("High", ticketFromDb.Priority);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithUnknownTicket_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/999", updateRequest);
+        Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithInvalidPriority_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "Invalid"
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/1", updateRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithInvalidTitle_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/1", updateRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+    }
 }

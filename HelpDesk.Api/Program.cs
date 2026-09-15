@@ -31,6 +31,7 @@ builder.Services.AddScoped<TicketQueryService>();
 builder.Services.AddScoped<TicketCreationService>();
 builder.Services.AddScoped<TicketCommentService>();
 builder.Services.AddScoped<TicketStatusService>();
+builder.Services.AddScoped<TicketUpdateService>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
