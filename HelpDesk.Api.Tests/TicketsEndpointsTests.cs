@@ -1,6 +1,7 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Domain;
 using HelpDesk.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
@@ -355,15 +356,21 @@ public class TicketsEndpointsTests
             Content = "This is a comment"
         };
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
-
         Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
+
+        var createdComment = await postResponse.Content.ReadFromJsonAsync<CommentResponse>();
+        Assert.NotNull(createdComment);
+        Assert.True(createdComment.Id > 0);
+        Assert.Equal("This is a comment", createdComment.Content);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(ticketFromDb);
         Assert.NotNull(ticketFromDb.Comments);
-        Assert.Single(ticketFromDb.Comments);
+        var persistedComment = Assert.Single(ticketFromDb.Comments);
+        Assert.Equal(createdComment.Id, persistedComment.Id);
+        Assert.Equal(userId, persistedComment.Author.Id);
         Assert.Equal("This is a comment", ticketFromDb.Comments.First().Content);
     }
 
@@ -456,5 +463,10 @@ public class TicketsEndpointsTests
         };
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
         Assert.Equal(HttpStatusCode.Conflict, postResponse.StatusCode);
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.Empty(ticketFromDb.Comments);
     }
 }
