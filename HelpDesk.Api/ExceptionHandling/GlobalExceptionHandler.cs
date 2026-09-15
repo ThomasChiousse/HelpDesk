@@ -33,6 +33,9 @@ public class GlobalExceptionHandler : IExceptionHandler
             TicketHasNoAssigneeException =>
                 StatusCodes.Status409Conflict,
 
+            TicketClosedException =>
+                StatusCodes.Status409Conflict,
+
             _ =>
                 StatusCodes.Status500InternalServerError
         };

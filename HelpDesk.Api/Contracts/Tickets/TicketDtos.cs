@@ -23,6 +23,15 @@ namespace HelpDesk.Api.Contracts.Tickets
         UserResponse? AssignedUser,
         IReadOnlyCollection<CommentResponse> Comments);
 
+    public class CreateCommentRequest
+    {
+        [Range(1, int.MaxValue)]
+        public int AuthorId { get; init; }
+
+        [MaxLength(4000)]
+        public string Content { get; init; } = "";
+    }
+
     public class CreateTicketRequest
     {
         [Required]

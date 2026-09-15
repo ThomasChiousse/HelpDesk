@@ -323,4 +323,138 @@ public class TicketsEndpointsTests
         var deleteResponse = await client.DeleteAsync($"/api/tickets/999/assignee/999");
         Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task AddComment_WithValidRequest_ShouldCreateComment()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        int userId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+            var user = new User("Thomas", "Banana", "thomas.banana@example.com", UserRole.Technician);
+            await context.Tickets.AddAsync(ticket);
+
+            await context.Users.AddAsync(user);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+            userId = user.Id;
+
+        }
+
+        var request = new
+        {
+            AuthorId = userId,
+            Content = "This is a comment"
+        };
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
+
+        Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.NotNull(ticketFromDb.Comments);
+        Assert.Single(ticketFromDb.Comments);
+        Assert.Equal("This is a comment", ticketFromDb.Comments.First().Content);
+    }
+
+    [Fact]
+    public async Task AddComment_WithUnknownTicket_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        int userId;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var user = new User("Thomas", "Banana", "email@example.com", UserRole.Technician);
+            await context.Users.AddAsync(user);
+            await context.SaveChangesAsync();
+            userId = user.Id;
+        }
+
+        var request = new
+        {
+            AuthorId = userId,
+            Content = "This is a comment"
+        };
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/999/comments", request);
+        Assert.Equal(HttpStatusCode.NotFound, postResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddComment_WithUnknownAuthor_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var request = new
+        {
+            AuthorId = 999,
+            Content = "This is a comment"
+        };
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
+        Assert.Equal(HttpStatusCode.NotFound, postResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddComment_ToClosedTicket_ShouldReturnConflict()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        int userId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+
+            ticket.AdvanceStatus(); // open -> in progress
+            ticket.AdvanceStatus(); // in progress -> resolved
+            ticket.AdvanceStatus(); // resolved -> closed
+
+            var user = new User("Thomas", "Banana", "email@example.com", UserRole.Technician);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.Users.AddAsync(user);
+            await context.SaveChangesAsync();
+            userId = user.Id;
+            ticketId = ticket.Id;
+        }
+
+        var request = new
+        {
+            AuthorId = userId,
+            Content = "This is a comment"
+        };
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
+        Assert.Equal(HttpStatusCode.Conflict, postResponse.StatusCode);
+    }
 }
