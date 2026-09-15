@@ -1,4 +1,5 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
+using HelpDesk.Api.Mappings;
 using HelpDesk.Application.Services;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Mvc;
@@ -15,8 +16,9 @@ namespace HelpDesk.Api.Controllers
         private readonly TicketCommentService _ticketCommentService;
         private readonly TicketStatusService _ticketStatusService;
         private readonly TicketUpdateService _ticketUpdateService;
+        private readonly TicketPatchService ticketPatchService;
         public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService,
-            TicketCommentService ticketCommentService, TicketStatusService ticketStatusService, TicketUpdateService ticketUpdateService)
+            TicketCommentService ticketCommentService, TicketStatusService ticketStatusService, TicketUpdateService ticketUpdateService, TicketPatchService ticketPatchService)
         {
             _ticketQueryService = ticketQueryService;
             _ticketCreationService = ticketCreationService;
@@ -24,20 +26,14 @@ namespace HelpDesk.Api.Controllers
             _ticketCommentService = ticketCommentService;
             _ticketStatusService = ticketStatusService;
             _ticketUpdateService = ticketUpdateService;
+            this.ticketPatchService = ticketPatchService;
         }
 
         [HttpGet("{id:int}")]
         public async Task<ActionResult<TicketDetailsResponse>> GetById(int id, CancellationToken cancellationToken = default)
         {
             var ticket = await _ticketQueryService.GetByIdAsync(id, cancellationToken);
-
-            var response = new TicketDetailsResponse(ticket.Id, ticket.Title, ticket.Description, ticket.Priority.ToString(), ticket.Status.ToString(), ticket.CreationDate,
-                ticket.AssignedUser is null ? null : new UserResponse(ticket.AssignedUser.Id, ticket.AssignedUser.Firstname, ticket.AssignedUser.Lastname),
-                ticket.Comments.Select(
-                    c => new CommentResponse(
-                        c.Id, c.Content, c.CreationDate, new UserResponse(
-                            c.Author.Id, c.Author.Firstname, c.Author.Lastname))).ToList());
-            return Ok(response);
+            return Ok(ticket.ToDetailsResponse());
         }
 
         [HttpPost]
@@ -112,19 +108,31 @@ namespace HelpDesk.Api.Controllers
 
             await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
             var updatedTicket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
-            var ticketDetailsResponse = new TicketDetailsResponse(
-                updatedTicket.Id,
-                updatedTicket.Title,
-                updatedTicket.Description,
-                updatedTicket.Priority.ToString(),
-                updatedTicket.Status.ToString(),
-                updatedTicket.CreationDate,
-                updatedTicket.AssignedUser is null ? null : new UserResponse(updatedTicket.AssignedUser.Id, updatedTicket.AssignedUser.Firstname, updatedTicket.AssignedUser.Lastname),
-                updatedTicket.Comments.Select(
-                    c => new CommentResponse(
-                        c.Id, c.Content, c.CreationDate, new UserResponse(
-                            c.Author.Id, c.Author.Firstname, c.Author.Lastname))).ToList());
-            return Ok(ticketDetailsResponse);
+            return Ok(updatedTicket.ToDetailsResponse());
+        }
+
+        [HttpPatch("{ticketId:int}")]
+        public async Task<ActionResult<TicketDetailsResponse>> Patch(int ticketId, PatchTicketRequest request, CancellationToken cancellationToken = default)
+        {
+            TicketPriority? priority = null;
+            if (request.Priority is not null)
+            {
+                if (!Enum.TryParse<TicketPriority>(request.Priority, ignoreCase: true, out var parsedPriority) || !Enum.IsDefined(parsedPriority))
+                {
+                    ModelState.AddModelError(
+                        nameof(request.Priority),
+                        "Unknown ticket priority.");
+
+                    return ValidationProblem(ModelState);
+                }
+                priority = parsedPriority;
+            }
+
+            await ticketPatchService.PatchAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
+
+
+            var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
+            return Ok(ticket.ToDetailsResponse());
         }
     }
 }
