@@ -23,6 +23,19 @@ namespace HelpDesk.Api.Contracts.Tickets
         UserResponse? AssignedUser,
         IReadOnlyCollection<CommentResponse> Comments);
 
+    public record TicketListItemResponse(
+    int Id,
+    string Title,
+    string Priority,
+    string Status,
+    DateTime CreationDate);
+
+    public record PagedResponse<T>(
+    IReadOnlyCollection<T> Items,
+    int Page,
+    int PageSize,
+    int TotalCount);
+
     public record TicketStatusResponse(string Status);
 
     public class CreateCommentRequest
@@ -70,6 +83,17 @@ namespace HelpDesk.Api.Contracts.Tickets
         [MaxLength(4000)]
         public string? Description { get; init; }
 
+        public string? Priority { get; init; }
+    }
+
+    public class GetTicketsRequest
+    {
+        [Range(1, int.MaxValue)]
+        public int Page { get; init; } = 1;
+        [Range(1, 100)]
+        public int PageSize { get; init; } = 20;
+        public string? Search { get; init; }
+        public string? Status { get; init; }
         public string? Priority { get; init; }
     }
 }

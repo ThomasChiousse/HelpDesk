@@ -16,7 +16,7 @@ namespace HelpDesk.Api.Controllers
         private readonly TicketCommentService _ticketCommentService;
         private readonly TicketStatusService _ticketStatusService;
         private readonly TicketUpdateService _ticketUpdateService;
-        private readonly TicketPatchService ticketPatchService;
+        private readonly TicketPatchService _ticketPatchService;
         public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService,
             TicketCommentService ticketCommentService, TicketStatusService ticketStatusService, TicketUpdateService ticketUpdateService, TicketPatchService ticketPatchService)
         {
@@ -26,7 +26,7 @@ namespace HelpDesk.Api.Controllers
             _ticketCommentService = ticketCommentService;
             _ticketStatusService = ticketStatusService;
             _ticketUpdateService = ticketUpdateService;
-            this.ticketPatchService = ticketPatchService;
+            _ticketPatchService = ticketPatchService;
         }
 
         [HttpGet("{id:int}")]
@@ -137,7 +137,7 @@ namespace HelpDesk.Api.Controllers
                 priority = parsedPriority;
             }
 
-            await ticketPatchService.PatchAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
+            await _ticketPatchService.PatchAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
 
             var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
             return Ok(ticket.ToDetailsResponse());
