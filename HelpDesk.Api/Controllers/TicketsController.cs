@@ -13,13 +13,15 @@ namespace HelpDesk.Api.Controllers
         private readonly TicketCreationService _ticketCreationService;
         private readonly TicketAssignmentService _ticketAssignmentService;
         private readonly TicketCommentService _ticketCommentService;
+        private readonly TicketStatusService _ticketStatusService;
 
-        public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService, TicketCommentService ticketCommentService)
+        public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService, TicketCommentService ticketCommentService, TicketStatusService ticketStatusService)
         {
             _ticketQueryService = ticketQueryService;
             _ticketCreationService = ticketCreationService;
             _ticketAssignmentService = ticketAssignmentService;
             _ticketCommentService = ticketCommentService;
+            _ticketStatusService = ticketStatusService;
         }
 
         [HttpGet("{id:int}")]
@@ -86,6 +88,13 @@ namespace HelpDesk.Api.Controllers
                 comment.CreationDate,
                 new UserResponse(comment.Author.Id, comment.Author.Firstname, comment.Author.Lastname));
             return StatusCode(StatusCodes.Status201Created, response);
+        }
+
+        [HttpPatch("{ticketId:int}/status")]
+        public async Task<ActionResult<TicketStatus>> AdvanceStatus(int ticketId, CancellationToken cancellationToken = default)
+        {
+            var status = await _ticketStatusService.AdvanceStatusAsync(ticketId, cancellationToken);
+            return Ok(status);
         }
     }
 }

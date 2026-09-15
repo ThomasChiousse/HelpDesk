@@ -361,6 +361,7 @@ public class TicketsEndpointsTests
         var createdComment = await postResponse.Content.ReadFromJsonAsync<CommentResponse>();
         Assert.NotNull(createdComment);
         Assert.True(createdComment.Id > 0);
+        Assert.Equal(userId, createdComment.Author.Id);
         Assert.Equal("This is a comment", createdComment.Content);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
@@ -468,5 +469,72 @@ public class TicketsEndpointsTests
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(ticketFromDb);
         Assert.Empty(ticketFromDb.Comments);
+    }
+
+    [Fact]
+    public async Task AdvanceStatus_WithValidRequest_ShouldAdvanceStatus()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
+        Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
+        var advancedStatus = await patchResponse.Content.ReadFromJsonAsync<TicketStatus>();
+        Assert.Equal(TicketStatus.InProgress, advancedStatus);
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.Equal(TicketStatus.InProgress, Enum.Parse<TicketStatus>(ticketFromDb.Status));
+    }
+
+    [Fact]
+    public async Task AdvanceStatus_WhenTicketIsAlreadyClosed_ShouldReturnConflict()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+            ticket.AdvanceStatus(); // open -> in progress
+            ticket.AdvanceStatus(); // in progress -> resolved
+            ticket.AdvanceStatus(); // resolved -> closed
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.Conflict, patchResponse.StatusCode);
+
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.Equal(TicketStatus.Closed, Enum.Parse<TicketStatus>(ticketFromDb.Status));
+    }
+
+    [Fact]
+    public async Task AdvanceStatus_WithUnknownTicket_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var patchResponse = await client.PatchAsync($"/api/tickets/999/status", null);
+        Assert.Equal(HttpStatusCode.NotFound, patchResponse.StatusCode);
     }
 }
