@@ -59,13 +59,14 @@ public class TicketRepository : ITicketRepository
         {
             query = query.Where(t => t.Priority == priority.Value);
         }
-        if (!string.IsNullOrEmpty(search))
+        if (!string.IsNullOrWhiteSpace(search))
         {
             query = query.Where(t => t.Title.Contains(search) || t.Description.Contains(search));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query.OrderByDescending(t => t.CreationDate).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        var items = await query.OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
+            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         return (items, totalCount);
     }
 }
