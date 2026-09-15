@@ -93,14 +93,14 @@ namespace HelpDesk.Api.Controllers
         }
 
         [HttpPatch("{ticketId:int}/status")]
-        public async Task<ActionResult<TicketStatus>> AdvanceStatus(int ticketId, CancellationToken cancellationToken = default)
+        public async Task<ActionResult<TicketStatusResponse>> AdvanceStatus(int ticketId, CancellationToken cancellationToken = default)
         {
             var status = await _ticketStatusService.AdvanceStatusAsync(ticketId, cancellationToken);
             return Ok(new TicketStatusResponse(status.ToString()));
         }
 
         [HttpPut("{ticketId:int}")]
-        public async Task<IActionResult> Update(int ticketId, UpdateTicketRequest request, CancellationToken cancellationToken = default)
+        public async Task<ActionResult<TicketDetailsResponse>> Update(int ticketId, UpdateTicketRequest request, CancellationToken cancellationToken = default)
         {
             if (!Enum.TryParse<TicketPriority>(request.Priority, ignoreCase: true, out var priority)
                 || !Enum.IsDefined(priority))
@@ -110,16 +110,17 @@ namespace HelpDesk.Api.Controllers
                 return ValidationProblem(ModelState);
             }
 
-            var ticket = await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
+            await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
+            var updatedTicket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
             var ticketDetailsResponse = new TicketDetailsResponse(
-                ticket.Id,
-                ticket.Title,
-                ticket.Description,
-                ticket.Priority.ToString(),
-                ticket.Status.ToString(),
-                ticket.CreationDate,
-                ticket.AssignedUser is null ? null : new UserResponse(ticket.AssignedUser.Id, ticket.AssignedUser.Firstname, ticket.AssignedUser.Lastname),
-                ticket.Comments.Select(
+                updatedTicket.Id,
+                updatedTicket.Title,
+                updatedTicket.Description,
+                updatedTicket.Priority.ToString(),
+                updatedTicket.Status.ToString(),
+                updatedTicket.CreationDate,
+                updatedTicket.AssignedUser is null ? null : new UserResponse(updatedTicket.AssignedUser.Id, updatedTicket.AssignedUser.Firstname, updatedTicket.AssignedUser.Lastname),
+                updatedTicket.Comments.Select(
                     c => new CommentResponse(
                         c.Id, c.Content, c.CreationDate, new UserResponse(
                             c.Author.Id, c.Author.Firstname, c.Author.Lastname))).ToList());

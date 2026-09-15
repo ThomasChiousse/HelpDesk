@@ -564,6 +564,12 @@ public class TicketsEndpointsTests
         };
         var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updatedTicket = await updateResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+
+        Assert.NotNull(updatedTicket);
+        Assert.Equal("New Title", updatedTicket.Title);
+        Assert.Equal("New Description", updatedTicket.Description);
+        Assert.Equal("High", updatedTicket.Priority);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
