@@ -490,8 +490,9 @@ public class TicketsEndpointsTests
         }
         var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
-        var advancedStatus = await patchResponse.Content.ReadFromJsonAsync<TicketStatus>();
-        Assert.Equal(TicketStatus.InProgress, advancedStatus);
+        var advancedStatus = await patchResponse.Content.ReadFromJsonAsync<TicketStatusResponse>();
+        Assert.NotNull(advancedStatus);
+        Assert.Equal("InProgress", advancedStatus.Status);
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
@@ -520,10 +521,10 @@ public class TicketsEndpointsTests
             ticketId = ticket.Id;
         }
         var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
-
-        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.Conflict, patchResponse.StatusCode);
 
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(ticketFromDb);
         Assert.Equal(TicketStatus.Closed, Enum.Parse<TicketStatus>(ticketFromDb.Status));

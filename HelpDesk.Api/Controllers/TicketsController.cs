@@ -94,7 +94,7 @@ namespace HelpDesk.Api.Controllers
         public async Task<ActionResult<TicketStatus>> AdvanceStatus(int ticketId, CancellationToken cancellationToken = default)
         {
             var status = await _ticketStatusService.AdvanceStatusAsync(ticketId, cancellationToken);
-            return Ok(status);
+            return Ok(new TicketStatusResponse(status.ToString()));
         }
     }
 }

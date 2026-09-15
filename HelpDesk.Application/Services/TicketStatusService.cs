@@ -6,7 +6,7 @@ namespace HelpDesk.Application.Services;
 
 public class TicketStatusService
 {
-    ITicketRepository _ticketRepository;
+    private readonly ITicketRepository _ticketRepository;
     public TicketStatusService(ITicketRepository ticketRepository)
     {
         _ticketRepository = ticketRepository;

@@ -23,6 +23,8 @@ namespace HelpDesk.Api.Contracts.Tickets
         UserResponse? AssignedUser,
         IReadOnlyCollection<CommentResponse> Comments);
 
+    public record TicketStatusResponse(string Status);
+
     public class CreateCommentRequest
     {
         [Range(1, int.MaxValue)]
