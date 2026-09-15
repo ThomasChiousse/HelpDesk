@@ -114,6 +114,15 @@ namespace HelpDesk.Api.Controllers
         [HttpPatch("{ticketId:int}")]
         public async Task<ActionResult<TicketDetailsResponse>> Patch(int ticketId, PatchTicketRequest request, CancellationToken cancellationToken = default)
         {
+            if (request.Title is null && request.Description is null && request.Priority is null)
+            {
+                ModelState.AddModelError(
+                    string.Empty,
+                    "At least one field must be provided.");
+
+                return ValidationProblem(ModelState);
+            }
+
             TicketPriority? priority = null;
             if (request.Priority is not null)
             {
@@ -129,7 +138,6 @@ namespace HelpDesk.Api.Controllers
             }
 
             await ticketPatchService.PatchAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
-
 
             var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
             return Ok(ticket.ToDetailsResponse());

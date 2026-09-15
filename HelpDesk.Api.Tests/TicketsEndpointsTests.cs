@@ -726,7 +726,7 @@ public class TicketsEndpointsTests
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            Ticket ticket = new Ticket
+            Ticket ticket = new
             (
                 "Old Title",
                 "Old Description",
@@ -762,7 +762,7 @@ public class TicketsEndpointsTests
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            Ticket ticket = new Ticket
+            Ticket ticket = new
             (
                 "Old Title",
                 "Old Description",
@@ -780,6 +780,37 @@ public class TicketsEndpointsTests
         var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.BadRequest, patchResponse.StatusCode);
 
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketDetails = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketDetails);
+        Assert.Equal("Old Title", ticketDetails.Title);
+        Assert.Equal("Old Description", ticketDetails.Description);
+        Assert.Equal("Normal", ticketDetails.Priority);
+    }
+
+    [Fact]
+    public async Task PatchTicket_WithEmptyRequest_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new
+            (
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal
+            );
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var patchRequest = new PatchTicketRequest();
+        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, patchResponse.StatusCode);
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketDetails = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
