@@ -29,6 +29,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<TicketAssignmentService>();
 builder.Services.AddScoped<TicketQueryService>();
 builder.Services.AddScoped<TicketCreationService>();
+builder.Services.AddScoped<TicketCommentService>();
 
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

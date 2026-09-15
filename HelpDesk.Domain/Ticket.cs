@@ -15,7 +15,7 @@ namespace HelpDesk.Domain
         private readonly List<Comment> _comments = [];
         public IReadOnlyCollection<Comment> Comments => _comments.AsReadOnly();
 
-        public Ticket(int id, string title, string description, TicketPriority priority, User? affectedUser = null)
+        public Ticket(int id, string title, string description, TicketPriority priority, User? assignedUser = null)
         {
             if (id <= 0) throw new ArgumentException("id should be a positive integer", nameof(id));
             if (!IsTitleValid(title)) throw new ArgumentException("Title cannot be null, empty or whitespace.", nameof(title));
@@ -26,10 +26,10 @@ namespace HelpDesk.Domain
             Priority = priority;
             Status = TicketStatus.Open;
             CreationDate = DateTime.UtcNow;
-            AssignedUser = affectedUser;
+            AssignedUser = assignedUser;
         }
 
-        public Ticket(string title, string description, TicketPriority priority, User? affectedUser = null)
+        public Ticket(string title, string description, TicketPriority priority, User? assignedUser = null)
         {
 
             if (!IsTitleValid(title)) throw new ArgumentException("Title cannot be null, empty or whitespace.", nameof(title));
@@ -39,7 +39,7 @@ namespace HelpDesk.Domain
             Priority = priority;
             Status = TicketStatus.Open;
             CreationDate = DateTime.UtcNow;
-            AssignedUser = affectedUser;
+            AssignedUser = assignedUser;
         }
 
         private Ticket()
@@ -86,8 +86,7 @@ namespace HelpDesk.Domain
         public void UnassignUser(int userId)
         {
             if (AssignedUser is null)
-                throw new InvalidOperationException(
-                    "The ticket has no assigned user.");
+                throw new TicketHasNoAssigneeException(Id);
 
             if (AssignedUser.Id != userId)
                 throw new AssigneeMismatchException(userId, AssignedUser.Id);
