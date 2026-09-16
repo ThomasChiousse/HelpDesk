@@ -95,5 +95,9 @@ namespace HelpDesk.Api.Contracts.Tickets
         public string? Search { get; init; }
         public string? Status { get; init; }
         public string? Priority { get; init; }
+        [Range(1, int.MaxValue)]
+        public int? AssignedUserId { get; init; }
+        public bool? HasAssignee { get; init; }
+
     }
 }

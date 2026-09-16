@@ -51,5 +51,10 @@ namespace HelpDesk.Tests
         {
             throw new NotImplementedException();
         }
+
+        public Task<(IReadOnlyCollection<Ticket> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee, string? search, int page, int pageSize, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

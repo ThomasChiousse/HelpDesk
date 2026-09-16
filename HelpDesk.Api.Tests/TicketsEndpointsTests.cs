@@ -821,4 +821,86 @@ public class TicketsEndpointsTests
     }
 
     #endregion
+
+    #region GetTickets
+    private static void CreateNecessaryContextForGetTickets(HelpDeskDbContext context)
+    {
+        int max = 15;
+        int priorityEnumSize = Enum.GetValues<TicketPriority>().Length;
+        int statusEnumSize = Enum.GetValues<TicketStatus>().Length;
+        int userRoleEnumSize = Enum.GetValues<UserRole>().Length;
+        //populate tickets and users in the database
+        for (int i = 1; i <= max; i++)
+        {
+            Random rand = new();
+            var ticket = new Ticket(
+                $"Ticket {i}",
+                $"Description for ticket {i}",
+                (TicketPriority)rand.NextInt64(priorityEnumSize - 1));
+            context.Tickets.Add(ticket);
+            int nbOfStatusAdvances = (int)rand.NextInt64(statusEnumSize - 1);
+            for (int j = 0; j < nbOfStatusAdvances; j++)
+            {
+                ticket.AdvanceStatus();
+            }
+
+            var user = new User(
+                $"User{i}",
+                $"LastName{i}",
+                $"Email{i}@example.com",
+                (UserRole)rand.NextInt64(userRoleEnumSize - 1));
+            context.Users.Add(user);
+
+            // 50% chance to assign the user to the ticket
+            // to leave some tickets unassigned for testing purposes
+            if (rand.NextDouble() >= 0.5)
+            {
+                ticket.AssignUser(user);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task GetFilteredTickets_WithValidRequest_ShouldReturnOk()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        HelpDeskDbContext? context = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            CreateNecessaryContextForGetTickets(context);
+            await context.SaveChangesAsync();
+        }
+        string priorityFilter = "High";
+        string statusFilter = "Open";
+        var response = await client.GetAsync($"/api/tickets?status={statusFilter}&priority={priorityFilter}&page=1&pageSize=5");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        Assert.True(pagedResponse.TotalCount >= 0);
+        Assert.True(pagedResponse.Items.Count <= 5);
+        var items = pagedResponse.Items;
+        foreach (TicketListItemResponse item in items)
+        {
+            Assert.Equal(priorityFilter, item.Priority);
+            Assert.Equal(statusFilter, item.Status);
+        }
+        int itemsCount = items.Count;
+        int expectedTotalCount;
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var tickets = context.Tickets
+                .Where(t => t.Priority.ToString() == priorityFilter && t.Status.ToString() == statusFilter);
+            expectedTotalCount = tickets.Count();
+            Assert.Equal(expectedTotalCount, pagedResponse.TotalCount);
+            foreach (Ticket t in tickets)
+            {
+                Assert.Contains(items, i => i.Id == t.Id);
+            }
+        }
+    }
+
+    #endregion
 }
