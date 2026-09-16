@@ -75,6 +75,12 @@ public class TicketRepository : ITicketRepository
                     query = query.Where(t => t.AssignedUser == null);
             }
         }
+        else
+        {
+            query = assignedUserId is not null ?
+            query.Where(t => t.AssignedUser != null && t.AssignedUser.Id == assignedUserId) :
+            query;
+        }
 
 
         if (!string.IsNullOrWhiteSpace(search))
