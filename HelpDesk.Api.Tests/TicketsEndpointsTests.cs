@@ -1,7 +1,9 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Domain;
 using HelpDesk.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
@@ -10,6 +12,7 @@ namespace HelpDesk.Api.Tests;
 
 public class TicketsEndpointsTests
 {
+    #region PostTicket
     [Fact]
     public async Task PostTicket_WithValidRequest_ShouldReturnCreated()
     {
@@ -68,7 +71,9 @@ public class TicketsEndpointsTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+    #endregion
 
+    #region GetTicket
     [Theory]
     [InlineData(0)]
     [InlineData(-14)]
@@ -88,7 +93,9 @@ public class TicketsEndpointsTests
         Assert.Equal("Resource not found", problem.Title);
         Assert.Contains(id.ToString(), problem.Detail);
     }
+    #endregion
 
+    #region AssignUser
     [Fact]
     public async Task AssignUser_WithValidRequest_ShouldAssignUser()
     {
@@ -188,7 +195,9 @@ public class TicketsEndpointsTests
         var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/999", null);
         Assert.Equal(HttpStatusCode.NotFound, putResponse.StatusCode);
     }
+    #endregion
 
+    #region UnassignUser
     [Fact]
     public async Task UnassignUser_WithValidData_ShouldUnassignUser()
     {
@@ -323,7 +332,9 @@ public class TicketsEndpointsTests
         var deleteResponse = await client.DeleteAsync($"/api/tickets/999/assignee/999");
         Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
     }
+    #endregion
 
+    #region AddComment
     [Fact]
     public async Task AddComment_WithValidRequest_ShouldCreateComment()
     {
@@ -355,15 +366,22 @@ public class TicketsEndpointsTests
             Content = "This is a comment"
         };
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
-
         Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
+
+        var createdComment = await postResponse.Content.ReadFromJsonAsync<CommentResponse>();
+        Assert.NotNull(createdComment);
+        Assert.True(createdComment.Id > 0);
+        Assert.Equal(userId, createdComment.Author.Id);
+        Assert.Equal("This is a comment", createdComment.Content);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(ticketFromDb);
         Assert.NotNull(ticketFromDb.Comments);
-        Assert.Single(ticketFromDb.Comments);
+        var persistedComment = Assert.Single(ticketFromDb.Comments);
+        Assert.Equal(createdComment.Id, persistedComment.Id);
+        Assert.Equal(userId, persistedComment.Author.Id);
         Assert.Equal("This is a comment", ticketFromDb.Comments.First().Content);
     }
 
@@ -456,5 +474,486 @@ public class TicketsEndpointsTests
         };
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
         Assert.Equal(HttpStatusCode.Conflict, postResponse.StatusCode);
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.Empty(ticketFromDb.Comments);
     }
+    #endregion
+
+    #region AdvanceStatus
+    [Fact]
+    public async Task AdvanceStatus_WithValidRequest_ShouldAdvanceStatus()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
+        Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
+        var advancedStatus = await patchResponse.Content.ReadFromJsonAsync<TicketStatusResponse>();
+        Assert.NotNull(advancedStatus);
+        Assert.Equal("InProgress", advancedStatus.Status);
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.Equal(TicketStatus.InProgress, Enum.Parse<TicketStatus>(ticketFromDb.Status));
+    }
+
+    [Fact]
+    public async Task AdvanceStatus_WhenTicketIsAlreadyClosed_ShouldReturnConflict()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+            ticket.AdvanceStatus(); // open -> in progress
+            ticket.AdvanceStatus(); // in progress -> resolved
+            ticket.AdvanceStatus(); // resolved -> closed
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
+        Assert.Equal(HttpStatusCode.Conflict, patchResponse.StatusCode);
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.Equal(TicketStatus.Closed, Enum.Parse<TicketStatus>(ticketFromDb.Status));
+    }
+
+    [Fact]
+    public async Task AdvanceStatus_WithUnknownTicket_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var patchResponse = await client.PatchAsync($"/api/tickets/999/status", null);
+        Assert.Equal(HttpStatusCode.NotFound, patchResponse.StatusCode);
+    }
+    #endregion
+
+    #region UpdateTicket
+    [Fact]
+    public async Task UpdateTicket_WithValidRequest_ShouldUpdateTicket()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
+        var updatedTicket = await updateResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+
+        Assert.NotNull(updatedTicket);
+        Assert.Equal("New Title", updatedTicket.Title);
+        Assert.Equal("New Description", updatedTicket.Description);
+        Assert.Equal("High", updatedTicket.Priority);
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketFromDb);
+        Assert.Equal("New Title", ticketFromDb.Title);
+        Assert.Equal("New Description", ticketFromDb.Description);
+        Assert.Equal("High", ticketFromDb.Priority);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithUnknownTicket_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/999", updateRequest);
+        Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithInvalidPriority_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "Invalid"
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/1", updateRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithInvalidTitle_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/1", updateRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+    }
+    #endregion
+
+    #region PatchTicket
+    [Fact]
+    public async Task PatchTicket_WithOnlyTitle_ShouldOnlyUpdateTitle()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var patchRequest = new PatchTicketRequest
+        {
+            Title = "New Title"
+        };
+        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+        Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
+        var updatedTicket = await patchResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(updatedTicket);
+        Assert.Equal("New Title", updatedTicket.Title);
+        Assert.Equal("Old Description", updatedTicket.Description);
+        Assert.Equal("Normal", updatedTicket.Priority);
+    }
+
+    [Fact]
+    public async Task PatchTicket_WithOnlyPriority_ShouldOnlyUpdatePriority()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var patchRequest = new PatchTicketRequest
+        {
+            Priority = "High"
+        };
+        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+        Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
+        var updatedTicket = await patchResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(updatedTicket);
+        Assert.Equal("Old Title", updatedTicket.Title);
+        Assert.Equal("Old Description", updatedTicket.Description);
+        Assert.Equal("High", updatedTicket.Priority);
+    }
+
+    [Fact]
+    public async Task PatchTicket_WithUnknownTicket_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        var patchRequest = new PatchTicketRequest
+        {
+            Title = "New Title"
+        };
+        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/999", patchRequest);
+        Assert.Equal(HttpStatusCode.NotFound, patchResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task PatchTicket_WithInvalidPriority_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new
+            (
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal
+            );
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var patchRequest = new PatchTicketRequest
+        {
+            Priority = "Invalid"
+        };
+        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, patchResponse.StatusCode);
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketDetails = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketDetails);
+        Assert.Equal("Old Title", ticketDetails.Title);
+        Assert.Equal("Old Description", ticketDetails.Description);
+        Assert.Equal("Normal", ticketDetails.Priority);
+    }
+
+    [Fact]
+    public async Task PatchTicket_WithInvalidTitle_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new
+            (
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal
+            );
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var patchRequest = new PatchTicketRequest
+        {
+            Title = ""
+        };
+        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, patchResponse.StatusCode);
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketDetails = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketDetails);
+        Assert.Equal("Old Title", ticketDetails.Title);
+        Assert.Equal("Old Description", ticketDetails.Description);
+        Assert.Equal("Normal", ticketDetails.Priority);
+    }
+
+    [Fact]
+    public async Task PatchTicket_WithEmptyRequest_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new
+            (
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal
+            );
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var patchRequest = new PatchTicketRequest();
+        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+        Assert.Equal(HttpStatusCode.BadRequest, patchResponse.StatusCode);
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketDetails = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketDetails);
+        Assert.Equal("Old Title", ticketDetails.Title);
+        Assert.Equal("Old Description", ticketDetails.Description);
+        Assert.Equal("Normal", ticketDetails.Priority);
+    }
+
+    #endregion
+
+    #region GetTickets
+    private static async Task CreateNecessaryContextForGetTickets(HelpDeskDbContext context)
+    {
+        // Create tickets with different priorities and statuses
+        await context.Tickets.AddAsync(new Ticket("Ticket Title 1", "Ticket Description 1", TicketPriority.High));
+        await context.Tickets.AddAsync(new Ticket("Ticket Title 2", "Ticket Description 2", TicketPriority.High));
+        await context.Tickets.AddAsync(new Ticket("Ticket Title 3", "Ticket Description 3", TicketPriority.High));
+        await context.Tickets.AddAsync(new Ticket("Ticket Title 4", "Ticket Description 4", TicketPriority.High));
+        await context.Tickets.AddAsync(new Ticket("Ticket Title 5", "Ticket Description 5", TicketPriority.Normal));
+        await context.Tickets.AddAsync(new Ticket("Ticket Title 6", "Ticket Description 6", TicketPriority.High));
+
+        // Create users with different roles
+        await context.Users.AddAsync(new User("John", "Doe", "john.doe@example.com", UserRole.User));
+        await context.Users.AddAsync(new User("Jane", "Smith", "jane.smith@example.com", UserRole.Technician));
+        await context.Users.AddAsync(new User("Thomas", "DoesWhatHeCanLol", "thomas.doeswhathecanlol@example.com", UserRole.Administrator));
+        await context.SaveChangesAsync();
+
+        var ticket3 = context.Tickets.First(t => t.Title == "Ticket Title 3");
+        var ticket4 = context.Tickets.First(t => t.Title == "Ticket Title 4");
+        var ticket5 = context.Tickets.First(t => t.Title == "Ticket Title 5");
+        var ticket6 = context.Tickets.First(t => t.Title == "Ticket Title 6");
+        ticket6.AdvanceStatus(); // open -> in progress
+
+        var user1 = context.Users.First(u => u.Firstname == "John");
+        var user2 = context.Users.First(u => u.Firstname == "Jane");
+        var user3 = context.Users.First(u => u.Firstname == "Thomas");
+
+        // assign users
+        //ticket1.AssignedUser is null
+        //ticket2.AssignedUser is null
+        ticket3.AssignUser(user1);
+        ticket4.AssignUser(user1);
+        ticket5.AssignUser(user2);
+        ticket6.AssignUser(user3);
+        await context.SaveChangesAsync();
+
+    }
+
+    [Fact]
+    public async Task GetTickets_WithValidRequest_ShouldReturnOk()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        HelpDeskDbContext? context = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+
+        var responsePage1 = await client.GetAsync($"/api/tickets?status=Open&priority=High&page=1&pageSize=3");
+        Assert.Equal(HttpStatusCode.OK, responsePage1.StatusCode);
+        var pagedResponse1 = await responsePage1.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse1);
+        Assert.Equal(4, pagedResponse1.TotalCount);
+        Assert.Equal(3, pagedResponse1.Items.Count);
+        Assert.Equal(1, pagedResponse1.Page);
+        Assert.Equal(3, pagedResponse1.PageSize);
+        Assert.All(pagedResponse1.Items, item =>
+        {
+            Assert.Equal("High", item.Priority);
+            Assert.Equal("Open", item.Status);
+        });
+
+        List<TicketListItemResponse> filteredTicketsList = [.. pagedResponse1.Items];
+        // pagedResponse1.Items.ToList().ForEach(filteredTicketsList.Add);
+        var responsePage2 = await client.GetAsync($"/api/tickets?status=Open&priority=High&page=2&pageSize=3");
+        Assert.Equal(HttpStatusCode.OK, responsePage2.StatusCode);
+        var pagedResponse2 = await responsePage2.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse2);
+        Assert.Equal(4, pagedResponse2.TotalCount);
+        Assert.Single(pagedResponse2.Items);
+        Assert.Equal(2, pagedResponse2.Page);
+        Assert.Equal(3, pagedResponse2.PageSize);
+        Assert.Equal("High", pagedResponse2.Items.First().Priority);
+        Assert.Equal("Open", pagedResponse2.Items.First().Status);
+        Assert.DoesNotContain(pagedResponse2.Items.First().Title, pagedResponse1.Items.Select(t => t.Title));
+        filteredTicketsList.AddRange(pagedResponse2.Items);
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var expectedTickets = await context.Tickets
+                .Where(t =>
+                       t.Status == TicketStatus.Open
+                      && t.Priority == TicketPriority.High)
+                .OrderByDescending(t => t.CreationDate)
+                .ThenByDescending(t => t.Id)
+                .ToListAsync();
+
+
+            Assert.Equal(4, expectedTickets.Count);
+            for (int i = 0; i < expectedTickets.Count; i++)
+            {
+                Assert.Equal(expectedTickets[i].Title, filteredTicketsList[i].Title);
+                Assert.Equal(
+                    expectedTickets[i].Priority.ToString(),
+                    filteredTicketsList[i].Priority);
+                Assert.Equal(
+                    expectedTickets[i].Status.ToString(),
+                    filteredTicketsList[i].Status);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task GetTickets_WithInvalidStatus_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var response = await client.GetAsync($"/api/tickets?status=InvalidStatus");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        // pussy
+    }
+
+    [Fact]
+    public async Task GetTickets_WithInvalidPriority_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var response = await client.GetAsync($"/api/tickets?priority=InvalidPriority");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTickets_WithHasAssigneeFalseAndAssignedUserId_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var response = await client.GetAsync($"/api/tickets?hasAssignee=false&assignedUserId=1");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    #endregion
 }

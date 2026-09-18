@@ -24,5 +24,11 @@ namespace HelpDesk.Application.Services
                 : ticket;
         }
 
+        public async Task<(IReadOnlyCollection<Ticket> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee, string? search,
+                                                                                            int page, int pageSize, CancellationToken cancellationToken = default)
+        {
+            return await _ticketRepository.GetPagedAsync(status, priority, assignedUserId, hasAssignee, search, page, pageSize, cancellationToken);
+        }
+
     }
 }
