@@ -147,6 +147,16 @@ public class TicketsController : ControllerBase
     public async Task<ActionResult<PagedResponse<TicketListItemResponse>>> GetAll(
     [FromQuery] GetTicketsRequest request, CancellationToken cancellationToken = default)
     {
+        if (request.HasAssignee == false
+            && request.AssignedUserId is not null)
+        {
+            ModelState.AddModelError(
+                nameof(request.AssignedUserId),
+                "AssignedUserId cannot be used when HasAssignee is false.");
+
+            return ValidationProblem(ModelState);
+        }
+
         TicketStatus? status = null;
 
         if (request.Status is not null)

@@ -70,9 +70,7 @@ public class TicketRepository : ITicketRepository
             }
             else
             {
-                query = assignedUserId is not null ?
-                    throw new ArgumentException($"Cannot retrieve tickets without an assignee AND with assignee ID {assignedUserId}") :
-                    query = query.Where(t => t.AssignedUser == null);
+                query = query.Where(t => t.AssignedUser == null);
             }
         }
         else

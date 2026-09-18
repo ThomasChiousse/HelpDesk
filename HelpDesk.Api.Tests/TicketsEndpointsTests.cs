@@ -3,6 +3,7 @@ using HelpDesk.Domain;
 using HelpDesk.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
 using System.Net.Http.Json;
@@ -823,7 +824,7 @@ public class TicketsEndpointsTests
     #endregion
 
     #region GetTickets
-    private static async void CreateNecessaryContextForGetTickets(HelpDeskDbContext context)
+    private static async Task CreateNecessaryContextForGetTickets(HelpDeskDbContext context)
     {
         // Create tickets with different priorities and statuses
         await context.Tickets.AddAsync(new Ticket("Ticket Title 1", "Ticket Description 1", TicketPriority.High));
@@ -869,7 +870,7 @@ public class TicketsEndpointsTests
         using (var scope = factory.Services.CreateScope())
         {
             context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            CreateNecessaryContextForGetTickets(context);
+            await CreateNecessaryContextForGetTickets(context);
         }
 
         var responsePage1 = await client.GetAsync($"/api/tickets?status=Open&priority=High&page=1&pageSize=3");
@@ -886,8 +887,8 @@ public class TicketsEndpointsTests
             Assert.Equal("Open", item.Status);
         });
 
-        List<TicketListItemResponse> filteredTicketsList = [];
-        pagedResponse1.Items.ToList().ForEach(filteredTicketsList.Add);
+        List<TicketListItemResponse> filteredTicketsList = [.. pagedResponse1.Items];
+        // pagedResponse1.Items.ToList().ForEach(filteredTicketsList.Add);
         var responsePage2 = await client.GetAsync($"/api/tickets?status=Open&priority=High&page=2&pageSize=3");
         Assert.Equal(HttpStatusCode.OK, responsePage2.StatusCode);
         var pagedResponse2 = await responsePage2.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
@@ -903,14 +904,25 @@ public class TicketsEndpointsTests
         using (var scope = factory.Services.CreateScope())
         {
             context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            var query = context.Tickets.Where(t => t.Status == TicketStatus.Open && t.Priority == TicketPriority.High).OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id);
-            Assert.Equal(4, query.Count());
-            for (int i = 0; i < query.Count(); i++)
+            var expectedTickets = await context.Tickets
+                .Where(t =>
+                       t.Status == TicketStatus.Open
+                      && t.Priority == TicketPriority.High)
+                .OrderByDescending(t => t.CreationDate)
+                .ThenByDescending(t => t.Id)
+                .ToListAsync();
+
+
+            Assert.Equal(4, expectedTickets.Count);
+            for (int i = 0; i < expectedTickets.Count; i++)
             {
-                var ticket = query.Skip(i).First();
-                Assert.Equal(ticket.Title, filteredTicketsList[i].Title);
-                Assert.Equal(ticket.Priority.ToString(), filteredTicketsList[i].Priority);
-                Assert.Equal(ticket.Status.ToString(), filteredTicketsList[i].Status);
+                Assert.Equal(expectedTickets[i].Title, filteredTicketsList[i].Title);
+                Assert.Equal(
+                    expectedTickets[i].Priority.ToString(),
+                    filteredTicketsList[i].Priority);
+                Assert.Equal(
+                    expectedTickets[i].Status.ToString(),
+                    filteredTicketsList[i].Status);
             }
         }
     }
@@ -922,6 +934,7 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
         var response = await client.GetAsync($"/api/tickets?status=InvalidStatus");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        // pussy
     }
 
     [Fact]
