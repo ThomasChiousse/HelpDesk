@@ -1026,10 +1026,11 @@ public class TicketsEndpointsTests
             await CreateNecessaryContextForGetTickets(context);
         }
         var response = await client.GetAsync($"/api/tickets?assignedUserId=1");
-        //Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
         Assert.NotNull(pagedResponse);
         Assert.NotNull(pagedResponse.Items);
+
         var filteredTickets = pagedResponse.Items;
         List<Ticket>? expectedTickets = null;
         using (var scope = factory.Services.CreateScope())
@@ -1039,8 +1040,9 @@ public class TicketsEndpointsTests
                 .Where(t => t.AssignedUser != null && t.AssignedUser.Id == 1).OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
                 .ToListAsync();
         }
-        Assert.Equal(expectedTickets.Count, pagedResponse.TotalCount);
-        if (expectedTickets.Count == 0) return;
+        Assert.Equal(2, expectedTickets.Count);
+        Assert.Equal(2, pagedResponse.TotalCount);
+
         int i = 0;
         foreach (TicketListItemResponse t in filteredTickets)
         {
@@ -1061,7 +1063,7 @@ public class TicketsEndpointsTests
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
             await CreateNecessaryContextForGetTickets(context);
         }
-        var response = await client.GetAsync($"/api/tickets?assignedUserId={null}");
+        var response = await client.GetAsync($"/api/tickets?assignedUserId=");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
         Assert.NotNull(pagedResponse);
@@ -1141,7 +1143,7 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
         using (var scope = factory.Services.CreateScope())
         {
-            var context = factory.Services.GetRequiredService<HelpDeskDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
             await CreateNecessaryContextForGetTickets(context);
         }
 
@@ -1180,7 +1182,7 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
         using (var scope = factory.Services.CreateScope())
         {
-            var context = factory.Services.GetRequiredService<HelpDeskDbContext>();
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
             await CreateNecessaryContextForGetTickets(context);
         }
 
@@ -1202,9 +1204,9 @@ public class TicketsEndpointsTests
         var response1 = await client.GetAsync("/api/tickets?page=0");
         Assert.Equal(HttpStatusCode.BadRequest, response1.StatusCode);
         var response2 = await client.GetAsync("/api/tickets?pageSize=101");
-        Assert.Equal(HttpStatusCode.BadRequest, response1.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response2.StatusCode);
         var response3 = await client.GetAsync("/api/tickets?pageSize=0");
-        Assert.Equal(HttpStatusCode.BadRequest, response1.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, response3.StatusCode);
     }
 
     [Fact]
@@ -1212,6 +1214,15 @@ public class TicketsEndpointsTests
     {
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider
+                .GetRequiredService<HelpDeskDbContext>();
+
+            await CreateNecessaryContextForGetTickets(context);
+        }
+
         var response = await client.GetAsync("/api/tickets?search=NOMATCH");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
