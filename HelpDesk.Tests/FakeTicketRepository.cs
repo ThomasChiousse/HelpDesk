@@ -1,4 +1,5 @@
-﻿using HelpDesk.Application.Repositories;
+﻿using HelpDesk.Application.Common.Pagination;
+using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Tickets.Queries;
 using HelpDesk.Domain;
 
@@ -53,7 +54,7 @@ namespace HelpDesk.Tests
             throw new NotImplementedException();
         }
 
-        public Task<(IReadOnlyCollection<TicketListItem> Items, int TotalCount)> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
+        public Task<PagedResult<TicketListItem>> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException();
         }

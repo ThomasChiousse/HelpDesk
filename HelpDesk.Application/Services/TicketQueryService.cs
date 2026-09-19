@@ -1,4 +1,5 @@
-﻿using HelpDesk.Application.Repositories;
+﻿using HelpDesk.Application.Common.Pagination;
+using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Tickets.Queries;
 using HelpDesk.Domain;
 
@@ -25,7 +26,7 @@ namespace HelpDesk.Application.Services
                 : ticket;
         }
 
-        public async Task<(IReadOnlyCollection<TicketListItem> Items, int TotalCount)> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
+        public async Task<PagedResult<TicketListItem>> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
         {
             return await _ticketRepository.GetPagedAsync(options, cancellationToken);
         }

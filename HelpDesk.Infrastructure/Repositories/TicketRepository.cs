@@ -1,4 +1,5 @@
-﻿using HelpDesk.Application.Repositories;
+﻿using HelpDesk.Application.Common.Pagination;
+using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Sorting;
 using HelpDesk.Application.Tickets.Queries;
 using HelpDesk.Domain;
@@ -50,10 +51,8 @@ public class TicketRepository : ITicketRepository
         return await _context.Tickets.Include(t => t.AssignedUser).FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
-    public async Task<(IReadOnlyCollection<TicketListItem> Items, int TotalCount)> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
+    public async Task<PagedResult<TicketListItem>> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
     {
-
-
         IQueryable<Ticket> query = _context.Tickets.AsNoTracking();
         if (options.Status.HasValue)
         {
@@ -109,7 +108,7 @@ public class TicketRepository : ITicketRepository
         var items = await orderedQuery.Skip((options.Page - 1) * options.PageSize).Take(options.PageSize)
             .Select(t => new TicketListItem(t.Id, t.Title, t.Priority, t.Status, t.CreationDate))
             .ToListAsync(cancellationToken);
-        return (items, totalCount);
+        return new PagedResult<TicketListItem>(items, totalCount);
 
     }
 }
