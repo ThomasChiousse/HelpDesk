@@ -851,8 +851,8 @@ public class TicketsEndpointsTests
         var user3 = context.Users.First(u => u.Firstname == "Thomas");
 
         // assign users
-        //ticket1.AssignedUser is null
-        //ticket2.AssignedUser is null
+        // ticket1.AssignedUser is null
+        // ticket2.AssignedUser is null
         ticket3.AssignUser(user1);
         ticket4.AssignUser(user1);
         ticket5.AssignUser(user2);
@@ -888,7 +888,6 @@ public class TicketsEndpointsTests
         });
 
         List<TicketListItemResponse> filteredTicketsList = [.. pagedResponse1.Items];
-        // pagedResponse1.Items.ToList().ForEach(filteredTicketsList.Add);
         var responsePage2 = await client.GetAsync($"/api/tickets?status=Open&priority=High&page=2&pageSize=3");
         Assert.Equal(HttpStatusCode.OK, responsePage2.StatusCode);
         var pagedResponse2 = await responsePage2.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
@@ -934,7 +933,6 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
         var response = await client.GetAsync($"/api/tickets?status=InvalidStatus");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        // pussy
     }
 
     [Fact]
@@ -953,6 +951,273 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
         var response = await client.GetAsync($"/api/tickets?hasAssignee=false&assignedUserId=1");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTickets_WithTitleSearch_ShouldReturnFilteredTickets()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        HelpDeskDbContext? context = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+        var response = await client.GetAsync($"/api/tickets?search=Ticket Title 1");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        Assert.Single(pagedResponse.Items);
+        Assert.Equal("Ticket Title 1", pagedResponse.Items.First().Title);
+
+        var filteredTicket = pagedResponse.Items.First();
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var expectedTicket = await context.Tickets.Where(t => t.Title == "Ticket Title 1").ToListAsync();
+            Assert.NotNull(expectedTicket);
+            Assert.Single(expectedTicket);
+            Assert.Equal(expectedTicket.First().Title, filteredTicket.Title);
+            Assert.Equal(expectedTicket.First().Priority.ToString(), filteredTicket.Priority);
+            Assert.Equal(expectedTicket.First().Status.ToString(), filteredTicket.Status);
+        }
+    }
+
+    [Fact]
+    public async Task GetTickets_WithDescriptionSearch_ShouldReturnFilteredTickets()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        HelpDeskDbContext? context = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+        var response = await client.GetAsync($"/api/tickets?search=Description 4");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        Assert.Single(pagedResponse.Items);
+        var filteredTicket = pagedResponse.Items.First();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var expectedTicket = await context.Tickets.Where(t => t.Description == "Ticket Description 4").ToListAsync();
+            Assert.NotNull(expectedTicket);
+            Assert.Single(expectedTicket);
+            Assert.Equal(expectedTicket.First().Title, filteredTicket.Title);
+            Assert.Equal(expectedTicket.First().Priority.ToString(), filteredTicket.Priority);
+            Assert.Equal(expectedTicket.First().Status.ToString(), filteredTicket.Status);
+        }
+    }
+
+    [Fact]
+
+    public async Task GetTickets_WithUserAssignedId_ShouldReturnFilteredTickets()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+        var response = await client.GetAsync($"/api/tickets?assignedUserId=1");
+        //Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        Assert.NotNull(pagedResponse.Items);
+        var filteredTickets = pagedResponse.Items;
+        List<Ticket>? expectedTickets = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            expectedTickets = await context.Tickets
+                .Where(t => t.AssignedUser != null && t.AssignedUser.Id == 1).OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
+                .ToListAsync();
+        }
+        Assert.Equal(expectedTickets.Count, pagedResponse.TotalCount);
+        if (expectedTickets.Count == 0) return;
+        int i = 0;
+        foreach (TicketListItemResponse t in filteredTickets)
+        {
+            Assert.Equal(expectedTickets[i].Title, t.Title);
+            Assert.Equal(expectedTickets[i].Priority.ToString(), t.Priority);
+            Assert.Equal(expectedTickets[i].Status.ToString(), t.Status);
+            i++;
+        }
+    }
+
+    [Fact]
+    public async Task GetTickets_WithUserAssignedIdNull_ShouldReturnAllTickets()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+        var response = await client.GetAsync($"/api/tickets?assignedUserId={null}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        Assert.Equal(6, pagedResponse.Items.Count);
+    }
+
+    [Fact]
+    public async Task GetTickets_WhenHasAssigneeIsTrue_ShouldReturnFilteredTicketsWithAssignee()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+        var response = await client.GetAsync($"/api/tickets?hasAssignee=true");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        var filteredTickets = pagedResponse.Items;
+
+        List<Ticket>? expectedTickets = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            expectedTickets = await context.Tickets.Where(t => t.AssignedUser != null).OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id).ToListAsync();
+        }
+        Assert.Equal(expectedTickets.Count, filteredTickets.Count);
+        int i = 0;
+        foreach (TicketListItemResponse t in filteredTickets)
+        {
+            Assert.Equal(expectedTickets[i].Title, t.Title);
+            Assert.Equal(expectedTickets[i].Priority.ToString(), t.Priority);
+            Assert.Equal(expectedTickets[i].Status.ToString(), t.Status);
+            i++;
+        }
+    }
+
+    [Fact]
+    public async Task GetTickets_WhenHasAssigneeIsFalse_ShouldReturnFilteredTicketsWithoutAssignee()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+        var response = await client.GetAsync($"/api/tickets?hasAssignee=false");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        var filteredTickets = pagedResponse.Items;
+
+        List<Ticket>? expectedTickets = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            expectedTickets = await context.Tickets.Where(t => t.AssignedUser == null).OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id).ToListAsync();
+        }
+        Assert.Equal(expectedTickets.Count, filteredTickets.Count);
+        int i = 0;
+        foreach (TicketListItemResponse t in filteredTickets)
+        {
+            Assert.Equal(expectedTickets[i].Title, t.Title);
+            Assert.Equal(expectedTickets[i].Priority.ToString(), t.Priority);
+            Assert.Equal(expectedTickets[i].Status.ToString(), t.Status);
+            i++;
+        }
+    }
+
+    [Fact]
+    public async Task Get_Tickets_WithMultipleFilters_ShouldReturnFilteredTickets()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = factory.Services.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+
+        var response = await client.GetAsync("/api/tickets?status=open&priority=high&hasAssignee=true");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        // expected tickets matchings filters : tickets 3 and 4
+        Assert.Equal(2, pagedResponse.Items.Count);
+        var filteredTickets = pagedResponse.Items;
+        Assert.Equal(4, filteredTickets.First().Id);
+        Assert.Equal(3, filteredTickets.Last().Id);
+        Assert.All(filteredTickets, t =>
+        {
+            Assert.Equal("High", t.Priority);
+            Assert.Equal("Open", t.Status);
+        });
+        List<Ticket>? expectedTickets = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            expectedTickets = await context.Tickets.Where(t => t.AssignedUser != null
+                                                            && t.Priority == TicketPriority.High
+                                                            && t.Status == TicketStatus.Open)
+                                                    .OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id).ToListAsync();
+        }
+        Assert.Equal(2, expectedTickets.Count);
+        Assert.Equal(expectedTickets.First().Id, filteredTickets.First().Id);
+        Assert.Equal(expectedTickets.Last().Id, filteredTickets.Last().Id);
+    }
+
+    [Fact]
+    public async Task GetTickets_WithOOBPaging_ShouldReturnEmptyItems()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = factory.Services.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+
+        var response = await client.GetAsync("/api/tickets?pageSize=3&page=5");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        Assert.NotNull(pagedResponse.Items);
+        Assert.Empty(pagedResponse.Items);
+        Assert.Equal(6, pagedResponse.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetTickets_WithInvalidPageRelatedRequest_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        var response1 = await client.GetAsync("/api/tickets?page=0");
+        Assert.Equal(HttpStatusCode.BadRequest, response1.StatusCode);
+        var response2 = await client.GetAsync("/api/tickets?pageSize=101");
+        Assert.Equal(HttpStatusCode.BadRequest, response1.StatusCode);
+        var response3 = await client.GetAsync("/api/tickets?pageSize=0");
+        Assert.Equal(HttpStatusCode.BadRequest, response1.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTickets_WithNoMatchSearch_ShouldReturnEmptyItems()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var response = await client.GetAsync("/api/tickets?search=NOMATCH");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(pagedResponse);
+        Assert.Empty(pagedResponse.Items);
+        Assert.Equal(0, pagedResponse.TotalCount);
     }
 
     #endregion
