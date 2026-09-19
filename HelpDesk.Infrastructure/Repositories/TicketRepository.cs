@@ -1,5 +1,6 @@
 ﻿using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Sorting;
+using HelpDesk.Application.Tickets.Queries;
 using HelpDesk.Domain;
 using HelpDesk.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -49,7 +50,7 @@ public class TicketRepository : ITicketRepository
         return await _context.Tickets.Include(t => t.AssignedUser).FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
-    public async Task<(IReadOnlyCollection<Ticket> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee,
+    public async Task<(IReadOnlyCollection<TicketListItem> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee,
         string? search, int page, int pageSize, TicketSortField sortField, SortDirection sortDirection, CancellationToken cancellationToken = default)
     {
 
@@ -106,7 +107,9 @@ public class TicketRepository : ITicketRepository
                _ => throw new ArgumentOutOfRangeException()
            };
 
-        var items = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        var items = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize).
+            Select(t => new TicketListItem(t.Id, t.Title, t.Priority, t.Status, t.CreationDate)).
+            ToListAsync(cancellationToken);
         return (items, totalCount);
 
     }
