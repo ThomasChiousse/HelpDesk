@@ -58,5 +58,10 @@ namespace HelpDesk.Tests
         {
             throw new NotImplementedException();
         }
+
+        public Task<bool> ExistsAsync(int ticketId, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

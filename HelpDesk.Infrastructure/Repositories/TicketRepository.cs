@@ -109,6 +109,10 @@ public class TicketRepository : ITicketRepository
             .Select(t => new TicketListItem(t.Id, t.Title, t.Priority, t.Status, t.CreationDate))
             .ToListAsync(cancellationToken);
         return new PagedResult<TicketListItem>(items, totalCount);
+    }
 
+    public Task<bool> ExistsAsync(int ticketId, CancellationToken cancellationToken = default)
+    {
+        throw new NotImplementedException();
     }
 }

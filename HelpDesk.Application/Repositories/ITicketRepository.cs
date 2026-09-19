@@ -12,5 +12,6 @@ namespace HelpDesk.Application.Repositories
         Task<PagedResult<TicketListItem>> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default);
         Task AddAsync(Ticket ticket, CancellationToken cancellationToken = default);
         Task SaveChangesAsync(CancellationToken cancellationToken = default);
+        Task<bool> ExistsAsync(int ticketId, CancellationToken cancellationToken = default);
     }
 }
