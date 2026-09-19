@@ -73,14 +73,23 @@ public class TicketQueryMappingTests
         var result = request.ToQueryOptions();
 
         Assert.False(result.IsSuccess);
-        Assert.NotNull(result.Options);
+        Assert.Null(result.Options);
         Assert.Equal(4, result.Errors.Count);
-        Assert.Null(result.Options.Status);
-        Assert.Null(result.Options.Priority);
-        Assert.Equal(TicketSortField.CreationDate, result.Options.SortField); // because ToQueryOptions initializes sortField = 0 (0 => CreationDate in the SortField enum)
-        Assert.Equal(SortDirection.Ascending, result.Options.SortDirection); // because ToQueryOptions initializes sortDirection = 0 (0 => Ascending in the SortDirection enum)
-        Assert.Equal(2, result.Options.Page);
-        Assert.Equal(10, result.Options.PageSize);
+        Assert.Contains(
+            result.Errors,
+            e => e.Field == nameof(GetTicketsRequest.Status));
+
+        Assert.Contains(
+            result.Errors,
+            e => e.Field == nameof(GetTicketsRequest.Priority));
+
+        Assert.Contains(
+            result.Errors,
+            e => e.Field == nameof(GetTicketsRequest.SortBy));
+
+        Assert.Contains(
+            result.Errors,
+            e => e.Field == nameof(GetTicketsRequest.SortDirection));
     }
 
     [Fact]
@@ -94,7 +103,7 @@ public class TicketQueryMappingTests
 
         var result = request.ToQueryOptions();
         Assert.False(result.IsSuccess);
-        Assert.NotNull(result.Options);
+        Assert.Null(result.Options);
         Assert.Single(result.Errors);
         Assert.Equal("AssignedUserId", result.Errors.First().Field);
         Assert.Equal("AssignedUserId cannot be used when HasAssignee is false.", result.Errors.First().Message);

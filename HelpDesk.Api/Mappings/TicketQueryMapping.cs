@@ -59,7 +59,7 @@ public static class TicketQueryMapping
             }
         }
 
-        SortDirection sortDirection = 0;
+        SortDirection sortDirection = SortDirection.Descending;
 
         switch (request.SortDirection?.ToLowerInvariant())
         {
@@ -79,7 +79,7 @@ public static class TicketQueryMapping
                 break;
         }
 
-        TicketSortField sortField = 0;
+        TicketSortField sortField = TicketSortField.CreationDate;
 
         switch (request.SortBy?.ToLowerInvariant())
         {
@@ -105,6 +105,14 @@ public static class TicketQueryMapping
                     nameof(request.SortBy),
                     "SortBy must be 'creationDate', 'title', 'priority' or 'status'."));
                 break;
+        }
+
+
+        if (validationErrors.Count > 0)
+        {
+            return new TicketQueryMappingResult(
+                null,
+                validationErrors);
         }
 
         var options = new TicketQueryOptions
