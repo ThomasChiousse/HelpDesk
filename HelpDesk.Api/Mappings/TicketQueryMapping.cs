@@ -33,8 +33,10 @@ public static class TicketQueryMapping
                     nameof(request.Status),
                     "Unknown ticket status."));
             }
-
-            status = parsedStatus;
+            else
+            {
+                status = parsedStatus;
+            }
         }
 
         TicketPriority? priority = null;
@@ -51,8 +53,10 @@ public static class TicketQueryMapping
                     nameof(request.Priority),
                     "Unknown ticket priority."));
             }
-
-            priority = parsedPriority;
+            else
+            {
+                priority = parsedPriority;
+            }
         }
 
         SortDirection sortDirection = 0;
