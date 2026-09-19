@@ -1260,6 +1260,31 @@ public class TicketsEndpointsTests
 
         await context.SaveChangesAsync();
 
+        context.Entry(ticket1)
+            .Property(t => t.CreationDate)
+            .CurrentValue = new DateTime(2026, 1, 3);
+
+        context.Entry(ticket2)
+            .Property(t => t.CreationDate)
+            .CurrentValue = new DateTime(2026, 1, 6);
+
+        context.Entry(ticket3)
+            .Property(t => t.CreationDate)
+            .CurrentValue = new DateTime(2026, 1, 1);
+
+        context.Entry(ticket4)
+            .Property(t => t.CreationDate)
+            .CurrentValue = new DateTime(2025, 1, 7);
+
+        context.Entry(ticket5)
+            .Property(t => t.CreationDate)
+            .CurrentValue = new DateTime(2027, 1, 11);
+
+        context.Entry(ticket6)
+            .Property(t => t.CreationDate)
+            .CurrentValue = new DateTime(2012, 10, 28);
+        await context.SaveChangesAsync();
+
     }
 
     [Fact]
