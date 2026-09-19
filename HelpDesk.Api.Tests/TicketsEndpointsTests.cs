@@ -1041,6 +1041,7 @@ public class TicketsEndpointsTests
                 .ToListAsync();
         }
         Assert.Equal(2, expectedTickets.Count);
+        Assert.Equal(2, filteredTickets.Count);
         Assert.Equal(2, pagedResponse.TotalCount);
 
         int i = 0;
