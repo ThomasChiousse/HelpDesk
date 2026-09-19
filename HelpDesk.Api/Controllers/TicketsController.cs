@@ -170,4 +170,20 @@ public class TicketsController : ControllerBase
         var response = new PagedResponse<TicketListItemResponse>(items, request.Page, request.PageSize, result.TotalCount);
         return Ok(response);
     }
+
+    [HttpGet("{ticketId}/comments")]
+    public async Task<ActionResult<PagedResponse<CommentResponse>>> GetComments(
+        int ticketId, [FromQuery] GetCommentsRequest request, CancellationToken cancellationToken = default)
+    {
+        var result = await _ticketQueryService.GetCommentsPagedAsync(ticketId, request.Page, request.PageSize, cancellationToken);
+
+        var items = result.Items.Select(c => new CommentResponse(
+            c.Id,
+            c.Content,
+            c.CreationDate,
+            new UserResponse(c.Author.Id, c.Author.Firstname, c.Author.Lastname)
+            )).ToList();
+        var response = new PagedResponse<CommentResponse>(items, request.Page, request.PageSize, result.TotalCount);
+        return Ok(response);
+    }
 }

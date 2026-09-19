@@ -125,10 +125,10 @@ public class TicketRepository : ITicketRepository
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
             .OrderByDescending(c => c.CreationDate)
             .ThenByDescending(c => c.Id)
+                        .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(c => new CommentListItem(
                     c.Id,
                     c.Content,

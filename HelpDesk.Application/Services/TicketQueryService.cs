@@ -33,9 +33,17 @@ namespace HelpDesk.Application.Services
 
         public async Task<PagedResult<CommentListItem>> GetCommentsPagedAsync(int ticketId, int page, int pageSize, CancellationToken cancellationToken = default)
         {
-            return (await _ticketRepository.ExistsAsync(ticketId, cancellationToken)) ?
-                await _ticketRepository.GetCommentsPagedAsync(ticketId, page, pageSize, cancellationToken) :
-                throw new KeyNotFoundException($"Ticket with ID {ticketId} does not exist");
+            if (!await _ticketRepository.ExistsAsync(ticketId, cancellationToken))
+            {
+                throw new KeyNotFoundException(
+                    $"Cannot find the ticket with id: {ticketId}");
+            }
+
+            return await _ticketRepository.GetCommentsPagedAsync(
+                ticketId,
+                page,
+                pageSize,
+                cancellationToken);
         }
 
     }
