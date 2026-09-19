@@ -1,4 +1,5 @@
 ﻿using HelpDesk.Application.Repositories;
+using HelpDesk.Application.Sorting;
 using HelpDesk.Domain;
 
 namespace HelpDesk.Application.Services
@@ -25,9 +26,9 @@ namespace HelpDesk.Application.Services
         }
 
         public async Task<(IReadOnlyCollection<Ticket> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee, string? search,
-                                                                                            int page, int pageSize, CancellationToken cancellationToken = default)
+                                                                                            int page, int pageSize, TicketSortField sortField, SortDirection sortDirection, CancellationToken cancellationToken = default)
         {
-            return await _ticketRepository.GetPagedAsync(status, priority, assignedUserId, hasAssignee, search, page, pageSize, cancellationToken);
+            return await _ticketRepository.GetPagedAsync(status, priority, assignedUserId, hasAssignee, search, page, pageSize, sortField, sortDirection, cancellationToken);
         }
 
     }

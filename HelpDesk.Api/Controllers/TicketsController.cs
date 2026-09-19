@@ -243,11 +243,12 @@ public class TicketsController : ControllerBase
             default:
                 ModelState.AddModelError(
                     nameof(request.SortBy),
-                    "SortBy should only take one of the following value 'creationDate', 'title', 'priority' or 'status'}");
+                    "SortBy must be 'creationDate', 'title', 'priority' or 'status'.");
                 return ValidationProblem(ModelState);
         }
 
-        var result = await _ticketQueryService.GetPagedAsync(status, priority, request.AssignedUserId, request.HasAssignee, request.Search, request.Page, request.PageSize, cancellationToken);
+        var result = await _ticketQueryService.GetPagedAsync(status, priority, request.AssignedUserId, request.HasAssignee, request.Search,
+            request.Page, request.PageSize, sortField, sortDirection, cancellationToken);
         var items = result.Items.Select(t => new TicketListItemResponse(
           t.Id, t.Title, t.Priority.ToString(), t.Status.ToString(), t.CreationDate
            )).ToList();

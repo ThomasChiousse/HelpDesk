@@ -1,4 +1,5 @@
 ﻿using HelpDesk.Application.Repositories;
+using HelpDesk.Application.Sorting;
 using HelpDesk.Domain;
 using HelpDesk.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -48,8 +49,11 @@ public class TicketRepository : ITicketRepository
         return await _context.Tickets.Include(t => t.AssignedUser).FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
-    public async Task<(IReadOnlyCollection<Ticket> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee, string? search, int page, int pageSize, CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyCollection<Ticket> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee,
+        string? search, int page, int pageSize, TicketSortField sortField, SortDirection sortDirection, CancellationToken cancellationToken = default)
     {
+
+
         IQueryable<Ticket> query = _context.Tickets.AsNoTracking();
         if (status.HasValue)
         {
@@ -86,9 +90,21 @@ public class TicketRepository : ITicketRepository
             query = query.Where(t => t.Title.Contains(search) || t.Description.Contains(search));
         }
 
-        var totalCount = await query.CountAsync(cancellationToken);
-        var items = await query.OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
-            .Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        IOrderedQueryable<Ticket> orderedQuery =
+           (sortField, sortDirection) switch
+           {
+               (TicketSortField.CreationDate, SortDirection.Ascending) => query.OrderBy(t => t.CreationDate).ThenBy(t => t.Id),
+               (TicketSortField.Title, SortDirection.Ascending) => query.OrderBy(t => t.Title).ThenBy(t => t.Id),
+               (TicketSortField.Title, SortDirection.Descending) => query.OrderByDescending(t => t.Title).ThenByDescending(t => t.Id),
+               (TicketSortField.Priority, SortDirection.Ascending) => query.OrderBy(t => t.Priority).ThenBy(t => t.Id),
+               (TicketSortField.Priority, SortDirection.Descending) => query.OrderByDescending(t => t.Priority).ThenByDescending(t => t.Id),
+               (TicketSortField.Status, SortDirection.Ascending) => query.OrderBy(t => t.Status).ThenBy(t => t.Id),
+               (TicketSortField.Status, SortDirection.Descending) => query.OrderByDescending(t => t.Status).ThenByDescending(t => t.Id),
+               _ => query.OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
+           };
+
+        var totalCount = await orderedQuery.CountAsync(cancellationToken);
+        var items = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         return (items, totalCount);
 
     }
