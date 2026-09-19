@@ -824,6 +824,7 @@ public class TicketsEndpointsTests
     #endregion
 
     #region GetTickets
+    #region Part 1
     private static async Task CreateNecessaryContextForGetTickets(HelpDeskDbContext context)
     {
         // Create tickets with different priorities and statuses
@@ -1231,6 +1232,203 @@ public class TicketsEndpointsTests
         Assert.Empty(pagedResponse.Items);
         Assert.Equal(0, pagedResponse.TotalCount);
     }
+    #endregion
+    #region Part 2
+    private static async Task CreateNecessaryContextForTicketsSortingTests(HelpDeskDbContext context)
+    {
+        // Create tickets with different priorities and statuses
+        await context.Tickets.AddAsync(new Ticket("Computer not booting", "Ticket Description 1", TicketPriority.Low));
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        await context.Tickets.AddAsync(new Ticket("Printer caught on fire (happens?)", "Ticket Description 2", TicketPriority.High));
+        await context.Tickets.AddAsync(new Ticket("Client sad after cat ran away", "Ticket Description 3", TicketPriority.High));
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        await context.Tickets.AddAsync(new Ticket("I have no more ideas for titles", "Ticket Description 4", TicketPriority.Low));
+        await context.Tickets.AddAsync(new Ticket("Just kidding here is one more", "Ticket Description 5", TicketPriority.Normal));
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        await context.Tickets.AddAsync(new Ticket("Monitor HDMI port not working", "Ticket Description 6", TicketPriority.High));
 
+        await context.SaveChangesAsync();
+        var ticket1 = context.Tickets.First(t => t.Id == 1);
+        ticket1.AdvanceStatus(); // open -> in progress
+
+        var ticket3 = context.Tickets.First(t => t.Id == 3);
+        ticket3.AdvanceStatus(); // open -> in progress
+        ticket3.AdvanceStatus(); // in progress -> resolved
+        ticket3.AdvanceStatus(); // resolved -> closed
+
+        var ticket5 = context.Tickets.First(t => t.Id == 5);
+        ticket5.AdvanceStatus(); // open -> in progress
+        ticket5.AdvanceStatus(); // in progress -> resolved
+
+        var ticket6 = context.Tickets.First(t => t.Id == 6);
+        ticket6.AdvanceStatus(); // open -> in progress
+
+        await context.SaveChangesAsync();
+
+    }
+
+    [Fact]
+    public async Task GetSortedTickets_WithSortByAscTitle_ShouldReturnTicketsSortedByAscTitle()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForTicketsSortingTests(context);
+        }
+
+        var response = await client.GetAsync("/api/tickets?sortDirection=asc&sortBy=title");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sortedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(sortedResponse);
+        Assert.NotNull(sortedResponse.Items);
+        Assert.Equal(6, sortedResponse.Items.Count);
+        var sortedResponseList = sortedResponse.Items.ToList();
+        for (int i = 1; i < 6; i++)
+        {
+            int order = string.Compare(sortedResponseList[i - 1].Title, sortedResponseList[i].Title, StringComparison.Ordinal);
+            Assert.True(order < 0);
+        }
+    }
+
+    [Fact]
+    public async Task GetSortedTickets_WithSortByDescTitle_ShouldReturnTicketsSortedByDescTitle()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForTicketsSortingTests(context);
+        }
+
+        var response = await client.GetAsync("/api/tickets?sortDirection=desc&sortBy=title");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sortedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(sortedResponse);
+        Assert.NotNull(sortedResponse.Items);
+        Assert.Equal(6, sortedResponse.Items.Count);
+        var sortedResponseList = sortedResponse.Items.ToList();
+        for (int i = 1; i < 6; i++)
+        {
+            int order = string.Compare(sortedResponseList[i - 1].Title, sortedResponseList[i].Title, StringComparison.Ordinal);
+            Assert.True(order > 0);
+        }
+    }
+
+    [Fact]
+    public async Task GetSortedTickets_WithSortByAscPriority_ShouldReturnTicketsSortedByAscPriority()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForTicketsSortingTests(context);
+        }
+
+        var response = await client.GetAsync("/api/tickets?sortDirection=asc&sortBy=priority");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sortedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(sortedResponse);
+        Assert.NotNull(sortedResponse.Items);
+        Assert.Equal(6, sortedResponse.Items.Count);
+        var sortedResponseList = sortedResponse.Items.ToList();
+        for (int i = 1; i < 6; i++)
+        {
+            Enum.TryParse<TicketPriority>(sortedResponseList[i - 1].Priority, out var prio1);
+            Enum.TryParse<TicketPriority>(sortedResponseList[i].Priority, out var prio2);
+            Assert.True(prio1 <= prio2);
+            if (prio1 == prio2)
+            {
+                int id1 = sortedResponseList[i - 1].Id;
+                int id2 = sortedResponseList[i].Id;
+                Assert.True(id1 < id2);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task GetSortedTickets_WithSortByDescStatus_ShouldReturnTicketsSortedByDescStatus()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForTicketsSortingTests(context);
+        }
+
+        var response = await client.GetAsync("/api/tickets?sortDirection=desc&sortBy=status");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sortedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(sortedResponse);
+        Assert.NotNull(sortedResponse.Items);
+        Assert.Equal(6, sortedResponse.Items.Count);
+        var sortedResponseList = sortedResponse.Items.ToList();
+        for (int i = 1; i < 6; i++)
+        {
+
+            Enum.TryParse<TicketStatus>(sortedResponseList[i - 1].Status, out var status1);
+            Enum.TryParse<TicketStatus>(sortedResponseList[i].Status, out var status2);
+            Assert.True(status1 >= status2);
+            if (status1 == status2)
+            {
+                int id1 = sortedResponseList[i - 1].Id;
+                int id2 = sortedResponseList[i].Id;
+                Assert.True(id1 > id2);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task GetSortedTickets_WithNoSortOption_ShouldReturnTicketsSortedByDescCreationDate()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForTicketsSortingTests(context);
+        }
+
+        var response = await client.GetAsync("/api/tickets");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var sortedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(sortedResponse);
+        Assert.NotNull(sortedResponse.Items);
+        Assert.Equal(6, sortedResponse.Items.Count);
+        var sortedResponseList = sortedResponse.Items.ToList();
+        for (int i = 1; i < 6; i++)
+        {
+            Assert.True(sortedResponseList[i - 1].CreationDate >= sortedResponseList[i].CreationDate);
+        }
+    }
+
+    [Fact]
+    public async Task GetSortedTickets_WithInvalidSortBy_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var response = await client.GetAsync("/api/tickets?sortBy=model");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSortedTickets_WithInvalidSortDirection_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        var response = await client.GetAsync("/api/tickets?sortDirection=linear");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    #endregion
     #endregion
 }

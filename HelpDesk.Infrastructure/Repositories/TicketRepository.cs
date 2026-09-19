@@ -90,20 +90,22 @@ public class TicketRepository : ITicketRepository
             query = query.Where(t => t.Title.Contains(search) || t.Description.Contains(search));
         }
 
+        var totalCount = await query.CountAsync(cancellationToken);
+
         IOrderedQueryable<Ticket> orderedQuery =
            (sortField, sortDirection) switch
            {
                (TicketSortField.CreationDate, SortDirection.Ascending) => query.OrderBy(t => t.CreationDate).ThenBy(t => t.Id),
+               (TicketSortField.CreationDate, SortDirection.Descending) => query.OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id),
                (TicketSortField.Title, SortDirection.Ascending) => query.OrderBy(t => t.Title).ThenBy(t => t.Id),
                (TicketSortField.Title, SortDirection.Descending) => query.OrderByDescending(t => t.Title).ThenByDescending(t => t.Id),
                (TicketSortField.Priority, SortDirection.Ascending) => query.OrderBy(t => t.Priority).ThenBy(t => t.Id),
                (TicketSortField.Priority, SortDirection.Descending) => query.OrderByDescending(t => t.Priority).ThenByDescending(t => t.Id),
                (TicketSortField.Status, SortDirection.Ascending) => query.OrderBy(t => t.Status).ThenBy(t => t.Id),
                (TicketSortField.Status, SortDirection.Descending) => query.OrderByDescending(t => t.Status).ThenByDescending(t => t.Id),
-               _ => query.OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
+               _ => throw new ArgumentOutOfRangeException()
            };
 
-        var totalCount = await orderedQuery.CountAsync(cancellationToken);
         var items = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         return (items, totalCount);
 
