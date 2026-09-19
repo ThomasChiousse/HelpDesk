@@ -50,27 +50,26 @@ public class TicketRepository : ITicketRepository
         return await _context.Tickets.Include(t => t.AssignedUser).FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
-    public async Task<(IReadOnlyCollection<TicketListItem> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee,
-        string? search, int page, int pageSize, TicketSortField sortField, SortDirection sortDirection, CancellationToken cancellationToken = default)
+    public async Task<(IReadOnlyCollection<TicketListItem> Items, int TotalCount)> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
     {
 
 
         IQueryable<Ticket> query = _context.Tickets.AsNoTracking();
-        if (status.HasValue)
+        if (options.Status.HasValue)
         {
-            query = query.Where(t => t.Status == status.Value);
+            query = query.Where(t => t.Status == options.Status.Value);
         }
-        if (priority.HasValue)
+        if (options.Priority.HasValue)
         {
-            query = query.Where(t => t.Priority == priority.Value);
+            query = query.Where(t => t.Priority == options.Priority.Value);
         }
 
-        if (hasAssignee.HasValue)
+        if (options.HasAssignee.HasValue)
         {
-            if (hasAssignee.Value)
+            if (options.HasAssignee.Value)
             {
-                query = assignedUserId is not null ?
-                    query.Where(t => t.AssignedUser != null && t.AssignedUser.Id == assignedUserId) :
+                query = options.AssignedUserId is not null ?
+                    query.Where(t => t.AssignedUser != null && t.AssignedUser.Id == options.AssignedUserId) :
                     query.Where(t => t.AssignedUser != null);
             }
             else
@@ -80,21 +79,21 @@ public class TicketRepository : ITicketRepository
         }
         else
         {
-            query = assignedUserId is not null ?
-            query.Where(t => t.AssignedUser != null && t.AssignedUser.Id == assignedUserId) :
+            query = options.AssignedUserId is not null ?
+            query.Where(t => t.AssignedUser != null && t.AssignedUser.Id == options.AssignedUserId) :
             query;
         }
 
 
-        if (!string.IsNullOrWhiteSpace(search))
+        if (!string.IsNullOrWhiteSpace(options.Search))
         {
-            query = query.Where(t => t.Title.Contains(search) || t.Description.Contains(search));
+            query = query.Where(t => t.Title.Contains(options.Search) || t.Description.Contains(options.Search));
         }
 
         var totalCount = await query.CountAsync(cancellationToken);
 
         IOrderedQueryable<Ticket> orderedQuery =
-           (sortField, sortDirection) switch
+           (options.SortField, options.SortDirection) switch
            {
                (TicketSortField.CreationDate, SortDirection.Ascending) => query.OrderBy(t => t.CreationDate).ThenBy(t => t.Id),
                (TicketSortField.CreationDate, SortDirection.Descending) => query.OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id),
@@ -107,9 +106,11 @@ public class TicketRepository : ITicketRepository
                _ => throw new ArgumentOutOfRangeException()
            };
 
-        var items = await orderedQuery.Skip((page - 1) * pageSize).Take(pageSize).
-            Select(t => new TicketListItem(t.Id, t.Title, t.Priority, t.Status, t.CreationDate)).
-            ToListAsync(cancellationToken);
+        var items = await orderedQuery.Skip((options.Page - 1) * options.PageSize).Take(options.PageSize)
+            .Select(t => new TicketListItem(t.Id, t.Title, t.Priority, t.Status, t.CreationDate))
+            .ToListAsync(cancellationToken);
+        //var sql = orderedQuery.ToQueryString();
+        //Console.WriteLine($"SQL : {sql}");
         return (items, totalCount);
 
     }

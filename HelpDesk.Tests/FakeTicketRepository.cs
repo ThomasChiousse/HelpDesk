@@ -1,5 +1,4 @@
 ﻿using HelpDesk.Application.Repositories;
-using HelpDesk.Application.Sorting;
 using HelpDesk.Application.Tickets.Queries;
 using HelpDesk.Domain;
 
@@ -54,8 +53,7 @@ namespace HelpDesk.Tests
             throw new NotImplementedException();
         }
 
-        public Task<(IReadOnlyCollection<TicketListItem> Items, int TotalCount)> GetPagedAsync(TicketStatus? status, TicketPriority? priority, int? assignedUserId, bool? hasAssignee, string? search,
-            int page, int pageSize, TicketSortField sortField, SortDirection sortDirection, CancellationToken cancellationToken = default)
+        public Task<(IReadOnlyCollection<TicketListItem> Items, int TotalCount)> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
         {
             throw new NotImplementedException();
         }

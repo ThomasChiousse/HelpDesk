@@ -2,6 +2,7 @@
 using HelpDesk.Api.Mappings;
 using HelpDesk.Application.Services;
 using HelpDesk.Application.Sorting;
+using HelpDesk.Application.Tickets.Queries;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Mvc;
 
@@ -247,8 +248,20 @@ public class TicketsController : ControllerBase
                 return ValidationProblem(ModelState);
         }
 
-        var result = await _ticketQueryService.GetPagedAsync(status, priority, request.AssignedUserId, request.HasAssignee, request.Search,
-            request.Page, request.PageSize, sortField, sortDirection, cancellationToken);
+        var options = new TicketQueryOptions
+        {
+            Status = status,
+            Priority = priority,
+            AssignedUserId = request.AssignedUserId,
+            HasAssignee = request.HasAssignee,
+            Search = request.Search,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            SortField = sortField,
+            SortDirection = sortDirection
+        };
+
+        var result = await _ticketQueryService.GetPagedAsync(options, cancellationToken);
         var items = result.Items.Select(t => new TicketListItemResponse(
           t.Id, t.Title, t.Priority.ToString(), t.Status.ToString(), t.CreationDate
            )).ToList();
