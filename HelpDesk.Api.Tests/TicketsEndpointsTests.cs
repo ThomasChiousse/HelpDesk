@@ -1233,34 +1233,29 @@ public class TicketsEndpointsTests
         Assert.Equal(0, pagedResponse.TotalCount);
     }
     #endregion
+
     #region Part 2
     private static async Task CreateNecessaryContextForTicketsSortingTests(HelpDeskDbContext context)
     {
         // Create tickets with different priorities and statuses
-        await context.Tickets.AddAsync(new Ticket("Computer not booting", "Ticket Description 1", TicketPriority.Low));
-        await Task.Delay(TimeSpan.FromSeconds(1));
-        await context.Tickets.AddAsync(new Ticket("Printer caught on fire (happens?)", "Ticket Description 2", TicketPriority.High));
-        await context.Tickets.AddAsync(new Ticket("Client sad after cat ran away", "Ticket Description 3", TicketPriority.High));
-        await Task.Delay(TimeSpan.FromSeconds(1));
-        await context.Tickets.AddAsync(new Ticket("I have no more ideas for titles", "Ticket Description 4", TicketPriority.Low));
-        await context.Tickets.AddAsync(new Ticket("Just kidding here is one more", "Ticket Description 5", TicketPriority.Normal));
-        await Task.Delay(TimeSpan.FromSeconds(1));
-        await context.Tickets.AddAsync(new Ticket("Monitor HDMI port not working", "Ticket Description 6", TicketPriority.High));
-
+        var ticket1 = new Ticket("Computer not booting", "Ticket Description 1", TicketPriority.Low);
+        var ticket2 = new Ticket("Printer caught on fire (happens?)", "Ticket Description 2", TicketPriority.High);
+        var ticket3 = new Ticket("Client sad after cat ran away", "Ticket Description 3", TicketPriority.High);
+        var ticket4 = new Ticket("I have no more ideas for titles", "Ticket Description 4", TicketPriority.Low);
+        var ticket5 = new Ticket("Just kidding here is one more", "Ticket Description 5", TicketPriority.Normal);
+        var ticket6 = new Ticket("Monitor HDMI port not working", "Ticket Description 6", TicketPriority.High);
+        await context.Tickets.AddRangeAsync([ticket1, ticket2, ticket3, ticket4, ticket5, ticket6]);
         await context.SaveChangesAsync();
-        var ticket1 = context.Tickets.First(t => t.Id == 1);
+
         ticket1.AdvanceStatus(); // open -> in progress
 
-        var ticket3 = context.Tickets.First(t => t.Id == 3);
         ticket3.AdvanceStatus(); // open -> in progress
         ticket3.AdvanceStatus(); // in progress -> resolved
         ticket3.AdvanceStatus(); // resolved -> closed
 
-        var ticket5 = context.Tickets.First(t => t.Id == 5);
         ticket5.AdvanceStatus(); // open -> in progress
         ticket5.AdvanceStatus(); // in progress -> resolved
 
-        var ticket6 = context.Tickets.First(t => t.Id == 6);
         ticket6.AdvanceStatus(); // open -> in progress
 
         await context.SaveChangesAsync();
@@ -1340,8 +1335,8 @@ public class TicketsEndpointsTests
         var sortedResponseList = sortedResponse.Items.ToList();
         for (int i = 1; i < 6; i++)
         {
-            Enum.TryParse<TicketPriority>(sortedResponseList[i - 1].Priority, out var prio1);
-            Enum.TryParse<TicketPriority>(sortedResponseList[i].Priority, out var prio2);
+            Assert.True(Enum.TryParse<TicketPriority>(sortedResponseList[i - 1].Priority, out var prio1));
+            Assert.True(Enum.TryParse<TicketPriority>(sortedResponseList[i].Priority, out var prio2));
             Assert.True(prio1 <= prio2);
             if (prio1 == prio2)
             {
@@ -1374,8 +1369,8 @@ public class TicketsEndpointsTests
         for (int i = 1; i < 6; i++)
         {
 
-            Enum.TryParse<TicketStatus>(sortedResponseList[i - 1].Status, out var status1);
-            Enum.TryParse<TicketStatus>(sortedResponseList[i].Status, out var status2);
+            Assert.True(Enum.TryParse<TicketStatus>(sortedResponseList[i - 1].Status, out var status1));
+            Assert.True(Enum.TryParse<TicketStatus>(sortedResponseList[i].Status, out var status2));
             Assert.True(status1 >= status2);
             if (status1 == status2)
             {
@@ -1405,10 +1400,22 @@ public class TicketsEndpointsTests
         Assert.NotNull(sortedResponse.Items);
         Assert.Equal(6, sortedResponse.Items.Count);
         var sortedResponseList = sortedResponse.Items.ToList();
-        for (int i = 1; i < 6; i++)
+
+        List<int> expectedIds;
+
+        using (var scope = factory.Services.CreateScope())
         {
-            Assert.True(sortedResponseList[i - 1].CreationDate >= sortedResponseList[i].CreationDate);
+            var context = scope.ServiceProvider
+                .GetRequiredService<HelpDeskDbContext>();
+
+            expectedIds = await context.Tickets
+                .OrderByDescending(t => t.CreationDate)
+                .ThenByDescending(t => t.Id)
+                .Select(t => t.Id)
+                .ToListAsync();
         }
+
+        Assert.Equal(expectedIds, sortedResponse.Items.Select(t => t.Id));
     }
 
     [Fact]
