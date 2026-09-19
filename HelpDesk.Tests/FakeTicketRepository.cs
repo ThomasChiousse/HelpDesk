@@ -63,5 +63,10 @@ namespace HelpDesk.Tests
         {
             throw new NotImplementedException();
         }
+
+        public Task<PagedResult<CommentListItem>> GetCommentsPagedAsync(int ticketId, int page, int pageSize, CancellationToken cancellationToken = default)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -13,5 +13,6 @@ namespace HelpDesk.Application.Repositories
         Task AddAsync(Ticket ticket, CancellationToken cancellationToken = default);
         Task SaveChangesAsync(CancellationToken cancellationToken = default);
         Task<bool> ExistsAsync(int ticketId, CancellationToken cancellationToken = default);
+        Task<PagedResult<CommentListItem>> GetCommentsPagedAsync(int ticketId, int page, int pageSize, CancellationToken cancellationToken = default);
     }
 }

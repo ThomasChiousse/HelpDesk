@@ -111,8 +111,35 @@ public class TicketRepository : ITicketRepository
         return new PagedResult<TicketListItem>(items, totalCount);
     }
 
-    public Task<bool> ExistsAsync(int ticketId, CancellationToken cancellationToken = default)
+    public async Task<bool> ExistsAsync(int ticketId, CancellationToken cancellationToken = default)
     {
-        throw new NotImplementedException();
+        return await _context.Tickets
+            .AnyAsync(t => t.Id == ticketId, cancellationToken);
+    }
+
+    public async Task<PagedResult<CommentListItem>> GetCommentsPagedAsync(int ticketId, int page, int pageSize, CancellationToken cancellationToken = default)
+    {
+        var exists = await ExistsAsync(ticketId, cancellationToken);
+
+        IQueryable<Comment> query = _context.Tickets.Where(t => t.Id == ticketId)
+                .SelectMany(t => t.Comments);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderByDescending(c => c.CreationDate)
+            .ThenByDescending(c => c.Id)
+            .Select(c => new CommentListItem(
+                    c.Id,
+                    c.Content,
+                    c.CreationDate,
+                    new CommentAuthorItem(
+                        c.Author.Id,
+                        c.Author.Firstname,
+                        c.Author.Lastname)
+                ))
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<CommentListItem>(items, totalCount);
     }
 }
