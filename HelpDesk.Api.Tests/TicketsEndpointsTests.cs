@@ -1262,27 +1262,27 @@ public class TicketsEndpointsTests
 
         context.Entry(ticket1)
             .Property(t => t.CreationDate)
-            .CurrentValue = new DateTime(2026, 1, 3);
+            .CurrentValue = new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc);
 
         context.Entry(ticket2)
             .Property(t => t.CreationDate)
-            .CurrentValue = new DateTime(2026, 1, 6);
+            .CurrentValue = new DateTime(2026, 1, 6, 0, 0, 0, DateTimeKind.Utc);
 
         context.Entry(ticket3)
             .Property(t => t.CreationDate)
-            .CurrentValue = new DateTime(2026, 1, 1);
+            .CurrentValue = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         context.Entry(ticket4)
             .Property(t => t.CreationDate)
-            .CurrentValue = new DateTime(2025, 1, 7);
+            .CurrentValue = new DateTime(2025, 1, 7, 0, 0, 0, DateTimeKind.Utc);
 
         context.Entry(ticket5)
             .Property(t => t.CreationDate)
-            .CurrentValue = new DateTime(2027, 1, 11);
+            .CurrentValue = new DateTime(2027, 1, 11, 0, 0, 0, DateTimeKind.Utc);
 
         context.Entry(ticket6)
             .Property(t => t.CreationDate)
-            .CurrentValue = new DateTime(2012, 10, 28);
+            .CurrentValue = new DateTime(2012, 10, 28, 0, 0, 0, DateTimeKind.Utc);
         await context.SaveChangesAsync();
 
     }
