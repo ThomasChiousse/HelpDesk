@@ -98,6 +98,8 @@ namespace HelpDesk.Api.Contracts.Tickets
         [Range(1, int.MaxValue)]
         public int? AssignedUserId { get; init; }
         public bool? HasAssignee { get; init; }
+        public string? SortBy { get; init; }
+        public string? SortDirection { get; init; }
 
     }
 }

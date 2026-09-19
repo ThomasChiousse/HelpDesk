@@ -1,6 +1,7 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Api.Mappings;
 using HelpDesk.Application.Services;
+using HelpDesk.Application.Sorting;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Mvc;
 
@@ -195,6 +196,55 @@ public class TicketsController : ControllerBase
             }
 
             priority = parsedPriority;
+        }
+
+        SortDirection sortDirection;
+
+        switch (request.SortDirection?.ToLowerInvariant())
+        {
+            case null:
+            case "desc":
+                sortDirection = SortDirection.Descending;
+                break;
+
+            case "asc":
+                sortDirection = SortDirection.Ascending;
+                break;
+
+            default:
+                ModelState.AddModelError(
+                    nameof(request.SortDirection),
+                    "SortDirection must be 'asc' or 'desc'.");
+
+                return ValidationProblem(ModelState);
+        }
+
+        TicketSortField sortField;
+
+        switch (request.SortBy?.ToLowerInvariant())
+        {
+            case null:
+            case "creationdate":
+                sortField = TicketSortField.CreationDate;
+                break;
+
+            case "title":
+                sortField = TicketSortField.Title;
+                break;
+
+            case "priority":
+                sortField = TicketSortField.Priority;
+                break;
+
+            case "status":
+                sortField = TicketSortField.Status;
+                break;
+
+            default:
+                ModelState.AddModelError(
+                    nameof(request.SortBy),
+                    "SortBy should only take one of the following value 'creationDate', 'title', 'priority' or 'status'}");
+                return ValidationProblem(ModelState);
         }
 
         var result = await _ticketQueryService.GetPagedAsync(status, priority, request.AssignedUserId, request.HasAssignee, request.Search, request.Page, request.PageSize, cancellationToken);
