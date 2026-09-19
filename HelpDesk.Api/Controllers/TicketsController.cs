@@ -1,8 +1,6 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Api.Mappings;
 using HelpDesk.Application.Services;
-using HelpDesk.Application.Sorting;
-using HelpDesk.Application.Tickets.Queries;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Mvc;
 
@@ -149,119 +147,22 @@ public class TicketsController : ControllerBase
     public async Task<ActionResult<PagedResponse<TicketListItemResponse>>> GetAll(
     [FromQuery] GetTicketsRequest request, CancellationToken cancellationToken = default)
     {
-        if (request.HasAssignee == false
-            && request.AssignedUserId is not null)
+
+        var mapping = request.ToQueryOptions();
+
+        if (!mapping.IsSuccess)
         {
-            ModelState.AddModelError(
-                nameof(request.AssignedUserId),
-                "AssignedUserId cannot be used when HasAssignee is false.");
+            foreach (var error in mapping.Errors)
+            {
+                ModelState.AddModelError(
+                    error.Field,
+                    error.Message);
+            }
 
             return ValidationProblem(ModelState);
         }
 
-        TicketStatus? status = null;
-
-        if (request.Status is not null)
-        {
-            if (!Enum.TryParse<TicketStatus>(
-                    request.Status,
-                    ignoreCase: true,
-                    out var parsedStatus)
-                || !Enum.IsDefined(parsedStatus))
-            {
-                ModelState.AddModelError(
-                    nameof(request.Status),
-                    "Unknown ticket status.");
-
-                return ValidationProblem(ModelState);
-            }
-
-            status = parsedStatus;
-        }
-
-        TicketPriority? priority = null;
-
-        if (request.Priority is not null)
-        {
-            if (!Enum.TryParse<TicketPriority>(
-                    request.Priority,
-                    ignoreCase: true,
-                    out var parsedPriority)
-                || !Enum.IsDefined(parsedPriority))
-            {
-                ModelState.AddModelError(
-                    nameof(request.Priority),
-                    "Unknown ticket priority.");
-
-                return ValidationProblem(ModelState);
-            }
-
-            priority = parsedPriority;
-        }
-
-        SortDirection sortDirection;
-
-        switch (request.SortDirection?.ToLowerInvariant())
-        {
-            case null:
-            case "desc":
-                sortDirection = SortDirection.Descending;
-                break;
-
-            case "asc":
-                sortDirection = SortDirection.Ascending;
-                break;
-
-            default:
-                ModelState.AddModelError(
-                    nameof(request.SortDirection),
-                    "SortDirection must be 'asc' or 'desc'.");
-
-                return ValidationProblem(ModelState);
-        }
-
-        TicketSortField sortField;
-
-        switch (request.SortBy?.ToLowerInvariant())
-        {
-            case null:
-            case "creationdate":
-                sortField = TicketSortField.CreationDate;
-                break;
-
-            case "title":
-                sortField = TicketSortField.Title;
-                break;
-
-            case "priority":
-                sortField = TicketSortField.Priority;
-                break;
-
-            case "status":
-                sortField = TicketSortField.Status;
-                break;
-
-            default:
-                ModelState.AddModelError(
-                    nameof(request.SortBy),
-                    "SortBy must be 'creationDate', 'title', 'priority' or 'status'.");
-                return ValidationProblem(ModelState);
-        }
-
-        var options = new TicketQueryOptions
-        {
-            Status = status,
-            Priority = priority,
-            AssignedUserId = request.AssignedUserId,
-            HasAssignee = request.HasAssignee,
-            Search = request.Search,
-            Page = request.Page,
-            PageSize = request.PageSize,
-            SortField = sortField,
-            SortDirection = sortDirection
-        };
-
-        var result = await _ticketQueryService.GetPagedAsync(options, cancellationToken);
+        var result = await _ticketQueryService.GetPagedAsync(mapping.Options!, cancellationToken);
         var items = result.Items.Select(t => new TicketListItemResponse(
           t.Id, t.Title, t.Priority.ToString(), t.Status.ToString(), t.CreationDate
            )).ToList();

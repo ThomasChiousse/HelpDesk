@@ -109,8 +109,6 @@ public class TicketRepository : ITicketRepository
         var items = await orderedQuery.Skip((options.Page - 1) * options.PageSize).Take(options.PageSize)
             .Select(t => new TicketListItem(t.Id, t.Title, t.Priority, t.Status, t.CreationDate))
             .ToListAsync(cancellationToken);
-        //var sql = orderedQuery.ToQueryString();
-        //Console.WriteLine($"SQL : {sql}");
         return (items, totalCount);
 
     }
