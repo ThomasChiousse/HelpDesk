@@ -119,14 +119,14 @@ public class TicketRepository : ITicketRepository
 
     public async Task<PagedResult<CommentListItem>> GetCommentsPagedAsync(int ticketId, int page, int pageSize, CancellationToken cancellationToken = default)
     {
-        var exists = await ExistsAsync(ticketId, cancellationToken);
-
         IQueryable<Comment> query = _context.Tickets.Where(t => t.Id == ticketId)
                 .SelectMany(t => t.Comments);
 
         var totalCount = await query.CountAsync(cancellationToken);
 
         var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .OrderByDescending(c => c.CreationDate)
             .ThenByDescending(c => c.Id)
             .Select(c => new CommentListItem(
