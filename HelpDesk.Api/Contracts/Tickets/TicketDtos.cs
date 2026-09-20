@@ -20,8 +20,7 @@ namespace HelpDesk.Api.Contracts.Tickets
         string Priority,
         string Status,
         DateTime CreationDate,
-        UserResponse? AssignedUser,
-        IReadOnlyCollection<CommentResponse> Comments);
+        UserResponse? AssignedUser);
 
     public record TicketListItemResponse(
     int Id,

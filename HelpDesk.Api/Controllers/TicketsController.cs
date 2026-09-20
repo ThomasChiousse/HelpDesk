@@ -56,8 +56,8 @@ public class TicketsController : ControllerBase
             ticket.Priority.ToString(),
             ticket.Status.ToString(),
             ticket.CreationDate,
-            null,
-            []);
+            null
+            );
 
         return CreatedAtAction(nameof(GetById), new { id = ticket.Id }, response);
     }

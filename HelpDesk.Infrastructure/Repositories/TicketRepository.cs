@@ -41,8 +41,9 @@ public class TicketRepository : ITicketRepository
 
     public async Task<Ticket?> GetByIdWithDetailsAsync(int id, CancellationToken cancellationToken = default)
     {
-        return await _context.Tickets.AsNoTracking().Include(t => t.AssignedUser)
-            .Include(t => t.Comments).ThenInclude(c => c.Author)
+        return await _context.Tickets
+            .AsNoTracking()
+            .Include(t => t.AssignedUser)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 

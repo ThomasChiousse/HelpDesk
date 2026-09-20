@@ -19,16 +19,7 @@ public static class TicketMappings
                 : new UserResponse(
                     ticket.AssignedUser.Id,
                     ticket.AssignedUser.Firstname,
-                    ticket.AssignedUser.Lastname),
-            ticket.Comments
-                .Select(c => new CommentResponse(
-                    c.Id,
-                    c.Content,
-                    c.CreationDate,
-                    new UserResponse(
-                        c.Author.Id,
-                        c.Author.Firstname,
-                        c.Author.Lastname)))
-                .ToList());
+                    ticket.AssignedUser.Lastname)
+            );
     }
 }
