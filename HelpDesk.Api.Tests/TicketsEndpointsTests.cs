@@ -379,11 +379,20 @@ public class TicketsEndpointsTests
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(ticketFromDb);
-        // Assert.NotNull(ticketFromDb.Comments);
-        // var persistedComment = Assert.Single(ticketFromDb.Comments);
-        // Assert.Equal(createdComment.Id, persistedComment.Id);
-        // Assert.Equal(userId, persistedComment.Author.Id);
-        // Assert.Equal("This is a comment", ticketFromDb.Comments.First().Content);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider
+                .GetRequiredService<HelpDeskDbContext>();
+
+            var persistedComment = await context.Comments
+                .Include(c => c.Author)
+                .SingleAsync();
+
+            Assert.Equal(createdComment.Id, persistedComment.Id);
+            Assert.Equal(userId, persistedComment.Author.Id);
+            Assert.Equal("This is a comment", persistedComment.Content);
+        }
     }
 
     [Fact]
@@ -475,11 +484,14 @@ public class TicketsEndpointsTests
         };
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
         Assert.Equal(HttpStatusCode.Conflict, postResponse.StatusCode);
-        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
-        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
-        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
-        Assert.NotNull(ticketFromDb);
-        // Assert.Empty(ticketFromDb.Comments);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider
+                .GetRequiredService<HelpDeskDbContext>();
+
+            Assert.Empty(await context.Comments.ToListAsync());
+        }
     }
     #endregion
 
