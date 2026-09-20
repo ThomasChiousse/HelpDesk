@@ -859,7 +859,6 @@ public class TicketsEndpointsTests
         ticket5.AssignUser(user2);
         ticket6.AssignUser(user3);
         await context.SaveChangesAsync();
-
     }
 
     [Fact]
@@ -1462,5 +1461,169 @@ public class TicketsEndpointsTests
     }
 
     #endregion
+    #endregion
+
+    #region GetSortedComments
+
+    private static async Task CreateNecessaryContextForGetComments(HelpDeskDbContext context)
+    {
+        // Create ticket to add comments to
+        Ticket ticket1 = new("Ticket Title 1", "Ticket Description 1", TicketPriority.High);
+        await context.Tickets.AddAsync(ticket1);
+
+        // Create users with different roles
+        User u1 = new("John", "Doe", "john.doe@example.com", UserRole.User);
+        User u2 = new("Jane", "Smith", "jane.smith@example.com", UserRole.Technician);
+        User u3 = new("Thomas", "DoesWhatHeCanLol", "thomas.doeswhathecanlol@example.com", UserRole.Administrator);
+        await context.Users.AddRangeAsync([u1, u2, u3]);
+
+        Comment c1 = new(u1, "The first comment (u1's first)");
+        Comment c2 = new(u2, "The second comment (u2's first)");
+        Comment c3 = new(u1, "The third comment (u1's second)");
+        Comment c4 = new(u3, "The fourth comment (u3's first)");
+        Comment c5 = new(u1, "The fifth comment (u1's third)");
+        Comment c6 = new(u1, "The sixth comment (u1's fourth)");
+        await context.SaveChangesAsync();
+
+        context.Entry(c1)
+            .Property(c => c.CreationDate)
+            .CurrentValue = new DateTime(2005, 1, 3, 0, 0, 0, DateTimeKind.Utc);
+
+        context.Entry(c2)
+            .Property(c => c.CreationDate)
+            .CurrentValue = new DateTime(2026, 1, 6, 0, 0, 0, DateTimeKind.Utc);
+
+        context.Entry(c3)
+            .Property(c => c.CreationDate)
+            .CurrentValue = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        context.Entry(c4)
+            .Property(c => c.CreationDate)
+            .CurrentValue = new DateTime(2025, 1, 7, 0, 0, 0, DateTimeKind.Utc);
+
+        context.Entry(c5)
+            .Property(c => c.CreationDate)
+            .CurrentValue = new DateTime(2026, 1, 6, 0, 0, 0, DateTimeKind.Utc);
+
+        context.Entry(c6)
+            .Property(t => t.CreationDate)
+            .CurrentValue = new DateTime(2012, 10, 28, 0, 0, 0, DateTimeKind.Utc);
+
+        ticket1.AddComment(c1);
+        ticket1.AddComment(c2);
+        ticket1.AddComment(c3);
+        ticket1.AddComment(c4);
+        ticket1.AddComment(c5);
+        ticket1.AddComment(c6);
+        await context.SaveChangesAsync();
+
+    }
+
+    [Fact]
+    public async Task GetComments_WithValidRequest_ShouldReturnOk()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetComments(context);
+        }
+
+        var response = await client.GetAsync($"/api/tickets/1/comments");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var commentPagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
+        Assert.NotNull(commentPagedResponse);
+        Assert.Equal(6, commentPagedResponse.TotalCount);
+        Assert.NotNull(commentPagedResponse.Items);
+        Assert.Equal(6, commentPagedResponse.Items.Count);
+        var commentsList = commentPagedResponse.Items.ToList();
+        for (int i = 1; i < 6; i++)
+        {
+            var creationDate1 = commentsList[i - 1].CreationDate;
+            var creationDate2 = commentsList[i].CreationDate;
+            Assert.True(creationDate1 >= creationDate2);
+            if (creationDate1 == creationDate2)
+            {
+                int id1 = commentsList[i - 1].Id;
+                int id2 = commentsList[i].Id;
+                Assert.True(id1 > id2);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task GetComments_WithPagingdDataRequest_ShouldReturnOkAndProperlyPagedItems()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetComments(context);
+        }
+
+        var response1 = await client.GetAsync($"/api/tickets/1/comments?pageSize=4&page=1");
+        Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
+        var commentPagedResponse1 = await response1.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
+        Assert.NotNull(commentPagedResponse1);
+        Assert.Equal(6, commentPagedResponse1.TotalCount);
+        Assert.NotNull(commentPagedResponse1.Items);
+        Assert.Equal(4, commentPagedResponse1.Items.Count);
+
+        var response2 = await client.GetAsync($"/api/tickets/1/comments?pageSize=4&page=2");
+        Assert.Equal(HttpStatusCode.OK, response2.StatusCode);
+        var commentPagedResponse2 = await response2.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
+        Assert.NotNull(commentPagedResponse2);
+        Assert.Equal(6, commentPagedResponse2.TotalCount);
+        Assert.NotNull(commentPagedResponse2.Items);
+        Assert.Equal(2, commentPagedResponse2.Items.Count);
+
+        var response3 = await client.GetAsync($"/api/tickets/1/comments?pageSize=4&page=3");
+        Assert.Equal(HttpStatusCode.OK, response3.StatusCode);
+        var commentPagedResponse3 = await response3.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
+        Assert.NotNull(commentPagedResponse3);
+        Assert.Equal(6, commentPagedResponse3.TotalCount);
+        Assert.NotNull(commentPagedResponse3.Items);
+        Assert.Empty(commentPagedResponse3.Items);
+    }
+
+    [Fact]
+    public async Task GetComments_WhenTicketDoesNotExists_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync($"/api/tickets/1/comments");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        var commentPagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
+        Assert.NotNull(commentPagedResponse);
+        Assert.Equal(0, commentPagedResponse.TotalCount);
+        Assert.Null(commentPagedResponse.Items);
+    }
+
+    [Fact]
+    public async Task GetComments_WhenTicketDoesNotContainComments_ShouldReturnOkAndEmptyItems()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await context.Tickets.AddAsync(new Ticket("Some title", "Some description", TicketPriority.High));
+            await context.SaveChangesAsync();
+        }
+
+        var response = await client.GetAsync($"/api/tickets/1/comments");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var commentPagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
+        Assert.NotNull(commentPagedResponse);
+        Assert.Equal(0, commentPagedResponse.TotalCount);
+        Assert.NotNull(commentPagedResponse.Items);
+    }
+
     #endregion
 }

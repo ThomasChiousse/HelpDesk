@@ -127,7 +127,7 @@ public class TicketRepository : ITicketRepository
         var items = await query
             .OrderByDescending(c => c.CreationDate)
             .ThenByDescending(c => c.Id)
-                        .Skip((page - 1) * pageSize)
+            .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(c => new CommentListItem(
                     c.Id,
