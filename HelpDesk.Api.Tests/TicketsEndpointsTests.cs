@@ -1463,7 +1463,7 @@ public class TicketsEndpointsTests
     #endregion
     #endregion
 
-    #region GetSortedComments
+    #region GetComments
 
     private static async Task CreateNecessaryContextForGetComments(HelpDeskDbContext context)
     {
@@ -1539,6 +1539,13 @@ public class TicketsEndpointsTests
         Assert.NotNull(commentPagedResponse.Items);
         Assert.Equal(6, commentPagedResponse.Items.Count);
         var commentsList = commentPagedResponse.Items.ToList();
+
+        var janeComment = commentsList.Single(
+            c => c.Content == "The second comment (u2's first)");
+
+        Assert.Equal("Jane", janeComment.Author.Firstname);
+        Assert.Equal("Smith", janeComment.Author.Lastname);
+
         for (int i = 1; i < 6; i++)
         {
             var creationDate1 = commentsList[i - 1].CreationDate;
@@ -1554,7 +1561,7 @@ public class TicketsEndpointsTests
     }
 
     [Fact]
-    public async Task GetComments_WithPagingdDataRequest_ShouldReturnOkAndProperlyPagedItems()
+    public async Task GetComments_WithPagedDataRequest_ShouldReturnOkAndProperlyPagedItems()
     {
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
@@ -1580,6 +1587,7 @@ public class TicketsEndpointsTests
         Assert.Equal(6, commentPagedResponse2.TotalCount);
         Assert.NotNull(commentPagedResponse2.Items);
         Assert.Equal(2, commentPagedResponse2.Items.Count);
+        Assert.DoesNotContain(commentPagedResponse2.Items, c2 => commentPagedResponse1.Items.Any(c1 => c1.Id == c2.Id));
 
         var response3 = await client.GetAsync($"/api/tickets/1/comments?pageSize=4&page=3");
         Assert.Equal(HttpStatusCode.OK, response3.StatusCode);
@@ -1598,10 +1606,10 @@ public class TicketsEndpointsTests
 
         var response = await client.GetAsync($"/api/tickets/1/comments");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        var commentPagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
-        Assert.NotNull(commentPagedResponse);
-        Assert.Equal(0, commentPagedResponse.TotalCount);
-        Assert.Null(commentPagedResponse.Items);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+
+        Assert.NotNull(problem);
+        Assert.Equal(404, problem.Status);
     }
 
     [Fact]
@@ -1621,9 +1629,24 @@ public class TicketsEndpointsTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var commentPagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
         Assert.NotNull(commentPagedResponse);
+        Assert.Empty(commentPagedResponse.Items);
         Assert.Equal(0, commentPagedResponse.TotalCount);
         Assert.NotNull(commentPagedResponse.Items);
     }
 
+    [Theory]
+    [InlineData("/api/tickets/1/comments?page=0")]
+    [InlineData("/api/tickets/1/comments?pageSize=0")]
+    [InlineData("/api/tickets/1/comments?pageSize=101")]
+    public async Task GetComments_WithInvalidPagination_ShouldReturnBadRequest(
+    string url)
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync(url);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
     #endregion
 }
