@@ -31,23 +31,27 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>
                 options =>
                     options.UseSqlite(_connection));
         });
+    }
 
-        builder.ConfigureAppConfiguration((context, config) =>
+    public const string TestJwtKey =
+        "this-is-a-fake-integration-test-key-that-is-long-enough-123";
+    public const string TestJwtIssuer = "HelpDesk.Api";
+    public const string TestJwtAudience = "HelpDesk.Client";
+
+    protected override IHost CreateHost(
+        IHostBuilder builder)
+        {
+        builder.ConfigureHostConfiguration(config =>
         {
             config.AddInMemoryCollection(
                 new Dictionary<string, string?>
                 {
-                    ["Jwt:Key"] =
-                        "this-is-a-fake-integration-test-key-that-is-long-enough-123",
-                    ["Jwt:Issuer"] = "HelpDesk.Api",
-                    ["Jwt:Audience"] = "HelpDesk.Client"
+                    ["Jwt:Key"] = TestJwtKey,
+                    ["Jwt:Issuer"] = TestJwtIssuer,
+                    ["Jwt:Audience"] = TestJwtAudience
                 });
         });
-    }
 
-    protected override IHost CreateHost(
-        IHostBuilder builder)
-    {
         var host = base.CreateHost(builder);
 
         using var scope = host.Services.CreateScope();
