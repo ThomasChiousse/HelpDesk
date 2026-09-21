@@ -5,7 +5,7 @@ namespace HelpDesk.Api.Controllers;
 
 [ApiController]
 [Authorize]
-[Route("/api/auth")]
+[Route("api/auth")]
 public class AuthController : ControllerBase
 {
     [Authorize]
