@@ -40,7 +40,7 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>
 
     protected override IHost CreateHost(
         IHostBuilder builder)
-        {
+    {
         builder.ConfigureHostConfiguration(config =>
         {
             config.AddInMemoryCollection(

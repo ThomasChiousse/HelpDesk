@@ -1,10 +1,41 @@
-﻿using System.Net;
+﻿using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Net;
 using System.Net.Http.Headers;
+using System.Security.Claims;
+using System.Text;
 
 namespace HelpDesk.Api.Tests;
 
 public class AuthEndpointsTests
 {
+    private static string CreateValidJwt()
+    {
+        var key = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(
+                HelpDeskApiFactory.TestJwtKey));
+
+        var credentials = new SigningCredentials(
+            key,
+            SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(ClaimTypes.NameIdentifier, "42"),
+            new Claim(ClaimTypes.Email, "john@example.com"),
+            new Claim(ClaimTypes.Role, "Technician")
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: HelpDeskApiFactory.TestJwtIssuer,
+            audience: HelpDeskApiFactory.TestJwtAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(5),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
     [Fact]
     public async Task GetMe_WithoutToken_ShouldReturnUnauthorized()
     {
@@ -34,5 +65,23 @@ public class AuthEndpointsTests
         Assert.Equal(
             HttpStatusCode.Unauthorized,
             response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetMe_WithValidToken_ShouldReturnOk()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        var token = CreateValidJwt();
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue(
+                "Bearer",
+                token);
+
+        var response = await client.GetAsync("/api/auth/me");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 }
