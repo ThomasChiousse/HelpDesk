@@ -7,6 +7,7 @@
         public string Lastname { get; private set; } = null!;
         public string Email { get; private set; } = null!;
         public UserRole Role { get; private set; }
+        public string? PasswordHash { get; private set; } = null!;
 
         public User(int id, string firstname, string lastname, string email, UserRole role)
         {
@@ -61,11 +62,16 @@
             return !string.IsNullOrWhiteSpace(value);
         }
 
+        public void SetPasswordHash(string passwordHash)
+        {
+            if (string.IsNullOrWhiteSpace(passwordHash))
+            {
+                throw new ArgumentException(
+                    "Password hash must not be null or empty.",
+                    nameof(passwordHash));
+            }
 
-    }
-
-    public enum UserRole
-    {
-        User, Technician, Administrator
+            PasswordHash = passwordHash;
+        }
     }
 }

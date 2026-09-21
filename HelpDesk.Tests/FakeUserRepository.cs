@@ -26,5 +26,11 @@ namespace HelpDesk.Tests
             SaveChangesCalled = true;
             return Task.CompletedTask;
         }
+
+        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken)
+        {
+            var result = _users.FirstOrDefault(u => u.Email == email);
+            return Task.FromResult(result);
+        }
     }
 }
