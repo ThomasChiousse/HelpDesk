@@ -382,7 +382,7 @@ public class TicketsEndpointsTests
 
             var persistedComment = await context.Comments
                 .Include(c => c.Author)
-                .SingleAsync();
+                .SingleAsync(c => c.Id == createdComment.Id);
 
             Assert.Equal(createdComment.Id, persistedComment.Id);
             Assert.Equal(userId, persistedComment.Author.Id);
