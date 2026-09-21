@@ -13,10 +13,7 @@ public sealed class AspNetPasswordHasher : IPasswordHasher
         return _hasher.HashPassword(user, password);
     }
 
-    public bool Verify(
-        User user,
-        string passwordHash,
-        string providedPassword)
+    public bool Verify(User user, string passwordHash, string providedPassword)
     {
         var result = _hasher.VerifyHashedPassword(
             user,
