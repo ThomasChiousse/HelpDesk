@@ -37,9 +37,6 @@ builder.Services.AddScoped<TicketStatusService>();
 builder.Services.AddScoped<TicketUpdateService>();
 builder.Services.AddScoped<TicketPatchService>();
 
-builder.Services.AddAuthentication();
-builder.Services.AddAuthorization();
-
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
