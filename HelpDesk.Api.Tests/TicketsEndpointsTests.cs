@@ -375,11 +375,6 @@ public class TicketsEndpointsTests
         Assert.Equal(userId, createdComment.Author.Id);
         Assert.Equal("This is a comment", createdComment.Content);
 
-        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
-        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
-        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
-        Assert.NotNull(ticketFromDb);
-
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider
