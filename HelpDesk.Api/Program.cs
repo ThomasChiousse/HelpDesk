@@ -17,7 +17,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-
 if (!builder.Environment.IsEnvironment("Testing"))
 {
     builder.Services.AddDbContext<HelpDeskDbContext>(
@@ -31,6 +30,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IPasswordHasher, AspNetPasswordHasher>();
+builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
 builder.Services.AddScoped<TicketAssignmentService>();
 builder.Services.AddScoped<TicketQueryService>();
