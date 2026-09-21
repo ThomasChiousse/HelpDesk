@@ -25,8 +25,6 @@
 
         public User(string firstname, string lastname, string email, UserRole role)
         {
-            string a;
-            Console.WriteLine(a);
             if (!IsStringValid(firstname)) throw new ArgumentException("Firstname must not be null or empty", nameof(firstname));
             if (!IsStringValid(lastname)) throw new ArgumentException("Lastname must not be null or empty", nameof(lastname));
             if (!IsStringValid(email)) throw new ArgumentException("Email must not be null or empty", nameof(email));

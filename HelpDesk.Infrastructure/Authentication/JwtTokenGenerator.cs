@@ -6,6 +6,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
+namespace HelpDesk.Infrastructure.Authentication;
+
 public sealed class JwtTokenGenerator : IJwtTokenGenerator
 {
     private readonly string _key;
@@ -14,7 +16,17 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
 
     public JwtTokenGenerator(IConfiguration configuration)
     {
+        _key = configuration["Jwt:Key"]
+        ?? throw new InvalidOperationException(
+            "JWT signing key is not configured.");
 
+        _issuer = configuration["Jwt:Issuer"]
+            ?? throw new InvalidOperationException(
+                "JWT issuer is not configured.");
+
+        _audience = configuration["Jwt:Audience"]
+            ?? throw new InvalidOperationException(
+                "JWT audience is not configured.");
     }
 
     public string Generate(User user)
@@ -34,10 +46,10 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
         };
 
         var token = new JwtSecurityToken(
-            issuer: "HelpDesk.Api",
-            audience: "HelpDesk.Domain",
+            issuer: _issuer,
+            audience: _audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddSeconds(30),
+            expires: DateTime.UtcNow.AddMinutes(30),
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
