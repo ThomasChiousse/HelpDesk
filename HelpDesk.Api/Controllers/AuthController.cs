@@ -8,7 +8,6 @@ namespace HelpDesk.Api.Controllers;
 [Route("api/auth")]
 public class AuthController : ControllerBase
 {
-    [Authorize]
     [HttpGet("me")]
     public IActionResult Me()
     {
