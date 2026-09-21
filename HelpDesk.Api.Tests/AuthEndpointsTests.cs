@@ -2,6 +2,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
 
@@ -9,6 +10,7 @@ namespace HelpDesk.Api.Tests;
 
 public class AuthEndpointsTests
 {
+    #region Prework
     private static string CreateValidJwt()
     {
         var key = new SymmetricSecurityKey(
@@ -35,6 +37,12 @@ public class AuthEndpointsTests
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    public record CurrentUserResponse(
+    string UserId,
+    string Email,
+    string Role);
+    #endregion
 
     [Fact]
     public async Task GetMe_WithoutToken_ShouldReturnUnauthorized()
@@ -81,7 +89,12 @@ public class AuthEndpointsTests
                 token);
 
         var response = await client.GetAsync("/api/auth/me");
-
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var currentUser = await response.Content.ReadFromJsonAsync<CurrentUserResponse>();
+        Assert.NotNull(currentUser);
+        Assert.Equal("42", currentUser.UserId);
+        Assert.Equal("john@example.com", currentUser.Email);
+        Assert.Equal("Technician", currentUser.Role);
     }
 }
