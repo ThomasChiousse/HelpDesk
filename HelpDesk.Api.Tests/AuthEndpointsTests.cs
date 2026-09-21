@@ -1,4 +1,5 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using HelpDesk.Api.Contracts.Auth;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
@@ -37,11 +38,6 @@ public class AuthEndpointsTests
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
-
-    public record CurrentUserResponse(
-        string UserId,
-        string Email,
-        string Role);
     #endregion
 
     [Fact]

@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using HelpDesk.Api.Contracts.Auth;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
@@ -10,7 +11,7 @@ namespace HelpDesk.Api.Controllers;
 public class AuthController : ControllerBase
 {
     [HttpGet("me")]
-    public IActionResult Me()
+    public ActionResult<CurrentUserResponse> Me()
     {
         var userId = User.FindFirstValue(
             ClaimTypes.NameIdentifier);
@@ -21,11 +22,9 @@ public class AuthController : ControllerBase
         var role = User.FindFirstValue(
             ClaimTypes.Role);
 
-        return Ok(new
-        {
-            UserId = userId,
-            Email = email,
-            Role = role
-        });
+        return Ok(new CurrentUserResponse(
+            userId!,
+            email!,
+            role!));
     }
 }
