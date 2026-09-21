@@ -1,6 +1,8 @@
 using HelpDesk.Api.ExceptionHandling;
+using HelpDesk.Application.Authentication;
 using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Services;
+using HelpDesk.Infrastructure.Authentication;
 using HelpDesk.Infrastructure.Persistence;
 using HelpDesk.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -28,6 +30,7 @@ if (!builder.Environment.IsEnvironment("Testing"))
 builder.Services.AddOpenApi();
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IPasswordHasher, AspNetPasswordHasher>();
 
 builder.Services.AddScoped<TicketAssignmentService>();
 builder.Services.AddScoped<TicketQueryService>();
