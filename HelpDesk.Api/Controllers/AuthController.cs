@@ -13,7 +13,7 @@ public class AuthController : ControllerBase
     public IActionResult Me()
     {
         var userId = User.FindFirstValue(
-        ClaimTypes.NameIdentifier);
+            ClaimTypes.NameIdentifier);
 
         var email = User.FindFirstValue(
             ClaimTypes.Email);

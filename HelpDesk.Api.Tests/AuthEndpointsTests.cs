@@ -39,9 +39,9 @@ public class AuthEndpointsTests
     }
 
     public record CurrentUserResponse(
-    string UserId,
-    string Email,
-    string Role);
+        string UserId,
+        string Email,
+        string Role);
     #endregion
 
     [Fact]
