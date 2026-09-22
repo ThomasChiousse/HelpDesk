@@ -2,7 +2,7 @@
 using HelpDesk.Domain;
 using HelpDesk.Tests.TestRepositories;
 
-namespace HelpDesk.Tests.TestServices
+namespace HelpDesk.Tests.ServicesTests
 {
     public class TicketAssignmentServiceTests
     {

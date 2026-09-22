@@ -1,4 +1,5 @@
 ﻿using HelpDesk.Domain;
+using HelpDesk.Tests.Helpers.Users;
 namespace HelpDesk.Tests
 {
     public class CommentTests

@@ -10,9 +10,9 @@ namespace HelpDesk.Tests.TestRepositories
 
         public void Add(User user) => _users.Add(user);
 
-        public Task AddAsync(User user, CancellationToken cancellationToken = default)
+        public async Task AddAsync(User user, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            _users.Add(user);
         }
 
         public Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default)

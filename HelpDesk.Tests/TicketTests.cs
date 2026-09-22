@@ -1,5 +1,6 @@
 ﻿using HelpDesk.Domain;
 using HelpDesk.Domain.Exceptions;
+using HelpDesk.Tests.Helpers.Users;
 
 namespace HelpDesk.Tests;
 
