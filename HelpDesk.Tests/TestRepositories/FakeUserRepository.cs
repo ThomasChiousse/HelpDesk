@@ -10,9 +10,10 @@ namespace HelpDesk.Tests.TestRepositories
 
         public void Add(User user) => _users.Add(user);
 
-        public async Task AddAsync(User user, CancellationToken cancellationToken = default)
+        public Task AddAsync(User user, CancellationToken cancellationToken = default)
         {
             _users.Add(user);
+            return Task.CompletedTask;
         }
 
         public Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default)

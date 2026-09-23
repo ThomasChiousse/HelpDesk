@@ -1,7 +1,7 @@
 ﻿using HelpDesk.Application.Authentication;
 using HelpDesk.Domain;
 
-namespace HelpDesk.Api.Tests.Helpers.Authentication;
+namespace HelpDesk.Tests.Helpers.Authentication;
 
 public class FakeJwtTokenGenerator : IJwtTokenGenerator
 {

@@ -1,7 +1,7 @@
 ﻿using HelpDesk.Application.Authentication;
 using HelpDesk.Domain;
 
-namespace HelpDesk.Api.Tests.Helpers.Authentication;
+namespace HelpDesk.Tests.Helpers.Authentication;
 
 public class FakePasswordHasher : IPasswordHasher
 {
@@ -17,7 +17,6 @@ public class FakePasswordHasher : IPasswordHasher
     string passwordHash,
     string providedPassword)
     {
-        VerificationResult = passwordHash == providedPassword;
         return VerificationResult;
     }
 }
