@@ -45,7 +45,10 @@ public class AuthController : ControllerBase
             request.Password,
             cancellationToken);
 
-        if (!result.IsSuccess) { return Unauthorized(); }
+        if (!result.IsSuccess)
+        {
+            return Unauthorized();
+        }
 
         return Ok(new LoginResponse(result.Token!));
     }
