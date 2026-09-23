@@ -14,10 +14,10 @@ public class AuthenticationServiceTests
     [Fact]
     public async Task Authenticate_WhenUserDoesntExist_ShouldReturnIsSuccessFalse()
     {
+        _passwordHasher.VerificationResult = false;
+
         var authService = new AuthenticationService(_userRepository, _passwordHasher, _jwtTokenGenerator);
         var result = await authService.AuthenticateAsync("non_existant@email.com", "fake_pass");
-
-        _passwordHasher.VerificationResult = false;
 
         Assert.False(result.IsSuccess);
         Assert.Null(result.Token);
@@ -39,7 +39,7 @@ public class AuthenticationServiceTests
         _passwordHasher.VerificationResult = false;
 
         var authService = new AuthenticationService(_userRepository, _passwordHasher, _jwtTokenGenerator);
-        var result = await authService.AuthenticateAsync("non_existant@email.com", "fake_hash");
+        var result = await authService.AuthenticateAsync("john@example.com", "fake_hash");
 
         Assert.False(result.IsSuccess);
         Assert.Null(result.Token);
@@ -89,6 +89,6 @@ public class AuthenticationServiceTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(_jwtTokenGenerator.TokenToReturn, result.Token);
-        Assert.Equal(user, _jwtTokenGenerator.ReceivedUser);
+        Assert.Same(user, _jwtTokenGenerator.ReceivedUser);
     }
 }
