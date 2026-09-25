@@ -436,7 +436,7 @@ public class TicketsEndpointsTests
     public async Task AddComment_WithUnknownTicket_ShouldReturnNotFound()
     {
         using var factory = new HelpDeskApiFactory();
-        var userId = await SeedUserWithPasswordAsync(factory);
+        await SeedUserWithPasswordAsync(factory);
         var client = factory.CreateClient();
 
         var loginRequest = new LoginRequest("john@example.com", "correct-password");
@@ -465,7 +465,7 @@ public class TicketsEndpointsTests
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
         int ticketId;
-        int userId = await SeedUserWithPasswordAsync(factory);
+        await SeedUserWithPasswordAsync(factory);
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -552,8 +552,8 @@ public class TicketsEndpointsTests
     public async Task AddComment_WithDifferentAuthorIdInBody_ShouldNotAllowImpersonation()
     {
         using var factory = new HelpDeskApiFactory();
-        var userId = await SeedUserWithPasswordAsync(factory);
-
+        var userId1 = await SeedUserWithPasswordAsync(factory);
+        var userId2 = await SeedUserWithPasswordAsync(factory, "jane@example.com", "second-password");
         var client = factory.CreateClient();
 
         var loginRequest = new LoginRequest("john@example.com", "correct-password");
@@ -582,7 +582,7 @@ public class TicketsEndpointsTests
 
         var postRequest = new
         {
-            AuthorId = 999,
+            AuthorId = userId2,
             Content = "This seems like a very important ticket"
         };
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", postRequest);
@@ -590,8 +590,8 @@ public class TicketsEndpointsTests
 
         var commentResponse = await postResponse.Content.ReadFromJsonAsync<CommentResponse>();
         Assert.NotNull(commentResponse);
-        Assert.NotEqual(999, commentResponse.Author.Id);
-        Assert.Equal(userId, commentResponse.Author.Id);
+        Assert.NotEqual(userId2, commentResponse.Author.Id);
+        Assert.Equal(userId1, commentResponse.Author.Id);
 
     }
     #endregion
