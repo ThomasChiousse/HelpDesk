@@ -2,7 +2,9 @@
 using HelpDesk.Api.Mappings;
 using HelpDesk.Application.Services;
 using HelpDesk.Domain;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace HelpDesk.Api.Controllers;
 
@@ -75,10 +77,18 @@ public class TicketsController : ControllerBase
         return NoContent();
     }
 
+    [Authorize]
     [HttpPost("{ticketId:int}/comments")]
     public async Task<ActionResult<CommentResponse>> AddComment(int ticketId, CreateCommentRequest request, CancellationToken cancellationToken = default)
     {
-        var comment = await _ticketCommentService.AddCommentAsync(ticketId, request.AuthorId, request.Content, cancellationToken);
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        if (!int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized();
+        }
+
+        var comment = await _ticketCommentService.AddCommentAsync(ticketId, userId, request.Content, cancellationToken);
         var response = new CommentResponse(
             comment.Id,
             comment.Content,

@@ -39,9 +39,6 @@ namespace HelpDesk.Api.Contracts.Tickets
 
     public class CreateCommentRequest
     {
-        [Range(1, int.MaxValue)]
-        public int AuthorId { get; init; }
-
         [Required]
         [MaxLength(4000)]
         public string Content { get; init; } = "";

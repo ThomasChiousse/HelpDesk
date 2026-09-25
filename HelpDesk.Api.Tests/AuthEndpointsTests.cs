@@ -162,9 +162,7 @@ public class AuthEndpointsTests
             string.IsNullOrWhiteSpace(loginResponse.Token));
 
         client.DefaultRequestHeaders.Authorization =
-    new AuthenticationHeaderValue(
-        "Bearer",
-        loginResponse.Token);
+            new AuthenticationHeaderValue("Bearer", loginResponse.Token);
 
         var meResponse = await client.GetAsync(
             "/api/auth/me");

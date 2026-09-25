@@ -1,4 +1,6 @@
-﻿using HelpDesk.Api.Contracts.Tickets;
+﻿using HelpDesk.Api.Contracts.Auth;
+using HelpDesk.Api.Contracts.Tickets;
+using HelpDesk.Application.Authentication;
 using HelpDesk.Domain;
 using HelpDesk.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Http;
@@ -6,12 +8,46 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 
 namespace HelpDesk.Api.Tests;
 
 public class TicketsEndpointsTests
 {
+    #region Helpers
+    private static async Task<int> SeedUserWithPasswordAsync(
+    HelpDeskApiFactory factory,
+    string email = "john@example.com",
+    string password = "correct-password")
+    {
+        using var scope = factory.Services.CreateScope();
+
+        var context = scope.ServiceProvider
+            .GetRequiredService<HelpDeskDbContext>();
+
+        var passwordHasher = scope.ServiceProvider
+            .GetRequiredService<IPasswordHasher>();
+
+        var user = new User(
+            "John",
+            "Doe",
+            email,
+            UserRole.Technician);
+
+        var hash = passwordHasher.Hash(
+            user,
+            password);
+
+        user.SetPasswordHash(hash);
+
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        return user.Id;
+    }
+    #endregion
+
     #region PostTicket
     [Fact]
     public async Task PostTicket_WithValidRequest_ShouldReturnCreated()
@@ -337,7 +373,147 @@ public class TicketsEndpointsTests
 
     #region AddComment
     [Fact]
-    public async Task AddComment_WithValidRequest_ShouldCreateComment()
+    public async Task AddComment_WithAuthenticatedUser_ShouldUseAuthenticatedUserAsAuthor()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+        var client = factory.CreateClient();
+
+        var loginRequest = new LoginRequest("john@example.com", "correct-password");
+        var response = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResponse);
+
+        var token = loginResponse.Token;
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket("Broken mouse", "No more left clicking", TicketPriority.Normal);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+        }
+
+        var postRequest = new CreateCommentRequest
+        {
+            Content = "This seems like a very important ticket"
+        };
+
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", postRequest);
+        Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
+
+        var createdComment = await postResponse.Content.ReadFromJsonAsync<CommentResponse>();
+        Assert.NotNull(createdComment);
+        Assert.True(createdComment.Id > 0);
+        Assert.Equal(userId, createdComment.Author.Id);
+        Assert.Equal("This seems like a very important ticket", createdComment.Content);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider
+                .GetRequiredService<HelpDeskDbContext>();
+
+            var persistedComment = await context.Comments
+                .Include(c => c.Author)
+                .SingleAsync(c => c.Id == createdComment.Id);
+
+            Assert.Equal(createdComment.Id, persistedComment.Id);
+            Assert.Equal(userId, persistedComment.Author.Id);
+            Assert.Equal("This seems like a very important ticket", persistedComment.Content);
+        }
+    }
+
+    [Fact]
+    public async Task AddComment_WithUnknownTicket_ShouldReturnNotFound()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+        var client = factory.CreateClient();
+
+        var loginRequest = new LoginRequest("john@example.com", "correct-password");
+        var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        Assert.NotNull(loginPostResponse);
+
+        var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResponse);
+
+        var token = loginResponse.Token;
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        var request = new
+        {
+            Content = "This is a comment"
+        };
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/999/comments", request);
+        Assert.Equal(HttpStatusCode.NotFound, postResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task AddComment_ToClosedTicket_ShouldReturnConflict()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+        int ticketId;
+        int userId = await SeedUserWithPasswordAsync(factory);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+
+            ticket.AdvanceStatus(); // open -> in progress
+            ticket.AdvanceStatus(); // in progress -> resolved
+            ticket.AdvanceStatus(); // resolved -> closed
+
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+        }
+
+        var loginRequest = new LoginRequest("john@example.com", "correct-password");
+        var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        Assert.NotNull(loginPostResponse);
+
+        var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResponse);
+
+        var token = loginResponse.Token;
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        var request = new
+        {
+            Content = "This is a comment"
+        };
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
+        Assert.Equal(HttpStatusCode.Conflict, postResponse.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider
+                .GetRequiredService<HelpDeskDbContext>();
+
+            Assert.Empty(await context.Comments.ToListAsync());
+        }
+    }
+
+    [Fact]
+    public async Task AddComment_WithoutToken_ShouldReturnUnauthorized()
     {
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
@@ -367,126 +543,56 @@ public class TicketsEndpointsTests
             Content = "This is a comment"
         };
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
-        Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
-
-        var createdComment = await postResponse.Content.ReadFromJsonAsync<CommentResponse>();
-        Assert.NotNull(createdComment);
-        Assert.True(createdComment.Id > 0);
-        Assert.Equal(userId, createdComment.Author.Id);
-        Assert.Equal("This is a comment", createdComment.Content);
-
-        using (var scope = factory.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider
-                .GetRequiredService<HelpDeskDbContext>();
-
-            var persistedComment = await context.Comments
-                .Include(c => c.Author)
-                .SingleAsync(c => c.Id == createdComment.Id);
-
-            Assert.Equal(createdComment.Id, persistedComment.Id);
-            Assert.Equal(userId, persistedComment.Author.Id);
-            Assert.Equal("This is a comment", persistedComment.Content);
-        }
+        Assert.Equal(HttpStatusCode.Unauthorized, postResponse.StatusCode);
     }
 
-    [Fact]
-    public async Task AddComment_WithUnknownTicket_ShouldReturnNotFound()
-    {
-        using var factory = new HelpDeskApiFactory();
-        var client = factory.CreateClient();
 
-        int userId;
-
-        using (var scope = factory.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            var user = new User("Thomas", "Banana", "email@example.com", UserRole.Technician);
-            await context.Users.AddAsync(user);
-            await context.SaveChangesAsync();
-            userId = user.Id;
-        }
-
-        var request = new
-        {
-            AuthorId = userId,
-            Content = "This is a comment"
-        };
-        var postResponse = await client.PostAsJsonAsync($"/api/tickets/999/comments", request);
-        Assert.Equal(HttpStatusCode.NotFound, postResponse.StatusCode);
-    }
 
     [Fact]
-    public async Task AddComment_WithUnknownAuthor_ShouldReturnNotFound()
+    public async Task AddComment_WithDifferentAuthorIdInBody_ShouldNotAllowImpersonation()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+
+        var loginRequest = new LoginRequest("john@example.com", "correct-password");
+        var response = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResponse);
+
+        var token = loginResponse.Token;
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
 
         int ticketId;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            var ticket = new Ticket(
-                "Printer broken",
-                "The printer doesn't work",
-                TicketPriority.Normal);
+            var ticket = new Ticket("Broken mouse", "No more left clicking", TicketPriority.Normal);
+
             await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
+
             ticketId = ticket.Id;
         }
 
-        var request = new
+        var postRequest = new
         {
             AuthorId = 999,
-            Content = "This is a comment"
+            Content = "This seems like a very important ticket"
         };
-        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
-        Assert.Equal(HttpStatusCode.NotFound, postResponse.StatusCode);
-    }
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", postRequest);
+        Assert.Equal(HttpStatusCode.Created, postResponse.StatusCode);
 
-    [Fact]
-    public async Task AddComment_ToClosedTicket_ShouldReturnConflict()
-    {
-        using var factory = new HelpDeskApiFactory();
-        var client = factory.CreateClient();
-        int ticketId;
-        int userId;
-        using (var scope = factory.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            var ticket = new Ticket(
-                "Printer broken",
-                "The printer doesn't work",
-                TicketPriority.Normal);
+        var commentResponse = await postResponse.Content.ReadFromJsonAsync<CommentResponse>();
+        Assert.NotNull(commentResponse);
+        Assert.NotEqual(999, commentResponse.Author.Id);
+        Assert.Equal(userId, commentResponse.Author.Id);
 
-            ticket.AdvanceStatus(); // open -> in progress
-            ticket.AdvanceStatus(); // in progress -> resolved
-            ticket.AdvanceStatus(); // resolved -> closed
-
-            var user = new User("Thomas", "Banana", "email@example.com", UserRole.Technician);
-
-            await context.Tickets.AddAsync(ticket);
-            await context.Users.AddAsync(user);
-            await context.SaveChangesAsync();
-            userId = user.Id;
-            ticketId = ticket.Id;
-        }
-
-        var request = new
-        {
-            AuthorId = userId,
-            Content = "This is a comment"
-        };
-        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
-        Assert.Equal(HttpStatusCode.Conflict, postResponse.StatusCode);
-
-        using (var scope = factory.Services.CreateScope())
-        {
-            var context = scope.ServiceProvider
-                .GetRequiredService<HelpDeskDbContext>();
-
-            Assert.Empty(await context.Comments.ToListAsync());
-        }
     }
     #endregion
 
