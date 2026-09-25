@@ -216,6 +216,61 @@ public class AuthEndpointsTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task Login_WithEmptyEmail_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
 
+        var request = new LoginRequest(
+            "",
+            "some-password");
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            request);
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_WithInvalidEmail_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        var request = new LoginRequest(
+            "notanemailatall",
+            "some-password");
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            request);
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_WithEmptyPassword_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        var request = new LoginRequest(
+            "john@example.com",
+            "");
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            request);
+
+        Assert.Equal(
+            HttpStatusCode.BadRequest,
+            response.StatusCode);
+    }
     #endregion
 }
