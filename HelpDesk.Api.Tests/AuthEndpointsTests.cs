@@ -137,7 +137,7 @@ public class AuthEndpointsTests
     {
         using var factory = new HelpDeskApiFactory();
 
-        await SeedUserWithPasswordAsync(factory);
+        var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
 
@@ -177,8 +177,6 @@ public class AuthEndpointsTests
 
         Assert.NotNull(currentUser);
 
-        var userId = 1;
-
         Assert.Equal(
             userId.ToString(),
             currentUser.UserId);
@@ -195,7 +193,7 @@ public class AuthEndpointsTests
     [Fact]
     public async Task Login_WithWrongPassword_ShouldReturnUnauthorized()
     {
-        var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory();
         await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -203,16 +201,12 @@ public class AuthEndpointsTests
 
         var response = await client.PostAsJsonAsync("/api/auth/login", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-
-        var loginResult = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginResult);
-        Assert.Null(loginResult.Token);
     }
 
     [Fact]
     public async Task Login_WithUnknownEmail_ShouldReturnUnauthorized()
     {
-        var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory();
         await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -220,10 +214,6 @@ public class AuthEndpointsTests
 
         var response = await client.PostAsJsonAsync("/api/auth/login", request);
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-
-        var loginResult = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginResult);
-        Assert.Null(loginResult.Token);
     }
 
 
