@@ -383,10 +383,10 @@ public class TicketsEndpointsTests
         var response = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginResponse);
+        var loginPostResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginPostResponse);
 
-        var token = loginResponse.Token;
+        var token = loginPostResponse.Token;
 
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
@@ -441,7 +441,7 @@ public class TicketsEndpointsTests
 
         var loginRequest = new LoginRequest("john@example.com", "correct-password");
         var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
-        Assert.NotNull(loginPostResponse);
+        Assert.Equal(HttpStatusCode.OK, loginPostResponse.StatusCode);
 
         var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(loginResponse);
@@ -486,7 +486,7 @@ public class TicketsEndpointsTests
 
         var loginRequest = new LoginRequest("john@example.com", "correct-password");
         var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
-        Assert.NotNull(loginPostResponse);
+        Assert.Equal(HttpStatusCode.OK, loginPostResponse.StatusCode);
 
         var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
         Assert.NotNull(loginResponse);
