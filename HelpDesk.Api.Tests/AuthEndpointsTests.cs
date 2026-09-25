@@ -1,4 +1,8 @@
 ﻿using HelpDesk.Api.Contracts.Auth;
+using HelpDesk.Application.Authentication;
+using HelpDesk.Domain;
+using HelpDesk.Infrastructure.Persistence;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Net;
@@ -11,7 +15,7 @@ namespace HelpDesk.Api.Tests;
 
 public class AuthEndpointsTests
 {
-    #region Prework
+    #region Prework/Helpers
     private static string CreateValidJwt()
     {
         var key = new SymmetricSecurityKey(
@@ -38,8 +42,39 @@ public class AuthEndpointsTests
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    private static async Task<int> SeedUserWithPasswordAsync(
+    HelpDeskApiFactory factory,
+    string password = "correct-password")
+    {
+        using var scope = factory.Services.CreateScope();
+
+        var context = scope.ServiceProvider
+            .GetRequiredService<HelpDeskDbContext>();
+
+        var passwordHasher = scope.ServiceProvider
+            .GetRequiredService<IPasswordHasher>();
+
+        var user = new User(
+            "John",
+            "Doe",
+            "john@example.com",
+            UserRole.Technician);
+
+        var hash = passwordHasher.Hash(
+            user,
+            password);
+
+        user.SetPasswordHash(hash);
+
+        context.Users.Add(user);
+        await context.SaveChangesAsync();
+
+        return user.Id;
+    }
     #endregion
 
+    #region GetMe
     [Fact]
     public async Task GetMe_WithoutToken_ShouldReturnUnauthorized()
     {
@@ -93,4 +128,104 @@ public class AuthEndpointsTests
         Assert.Equal("john@example.com", currentUser.Email);
         Assert.Equal("Technician", currentUser.Role);
     }
+    #endregion
+
+    #region Login
+
+    [Fact]
+    public async Task Login_WithValidCredentials_ShouldReturnToken()
+    {
+        using var factory = new HelpDeskApiFactory();
+
+        await SeedUserWithPasswordAsync(factory);
+
+        var client = factory.CreateClient();
+
+        var request = new LoginRequest(
+            "john@example.com",
+            "correct-password");
+
+        var response = await client.PostAsJsonAsync(
+            "/api/auth/login",
+            request);
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            response.StatusCode);
+
+        var loginResponse =
+            await response.Content
+                .ReadFromJsonAsync<LoginResponse>();
+
+        Assert.NotNull(loginResponse);
+        Assert.False(
+            string.IsNullOrWhiteSpace(loginResponse.Token));
+
+        client.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue(
+        "Bearer",
+        loginResponse.Token);
+
+        var meResponse = await client.GetAsync(
+            "/api/auth/me");
+
+        Assert.Equal(
+            HttpStatusCode.OK,
+            meResponse.StatusCode);
+
+        var currentUser = await meResponse.Content.ReadFromJsonAsync<CurrentUserResponse>();
+
+        Assert.NotNull(currentUser);
+
+        var userId = 1;
+
+        Assert.Equal(
+            userId.ToString(),
+            currentUser.UserId);
+
+        Assert.Equal(
+            "john@example.com",
+            currentUser.Email);
+
+        Assert.Equal(
+            "Technician",
+            currentUser.Role);
+    }
+
+    [Fact]
+    public async Task Login_WithWrongPassword_ShouldReturnUnauthorized()
+    {
+        var factory = new HelpDeskApiFactory();
+        await SeedUserWithPasswordAsync(factory);
+
+        var client = factory.CreateClient();
+        var request = new LoginRequest("john@example.com", "wrongpassworddummy");
+
+        var response = await client.PostAsJsonAsync("/api/auth/login", request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+
+        var loginResult = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResult);
+        Assert.Null(loginResult.Token);
+    }
+
+    [Fact]
+    public async Task Login_WithUnknownEmail_ShouldReturnUnauthorized()
+    {
+        var factory = new HelpDeskApiFactory();
+        await SeedUserWithPasswordAsync(factory);
+
+        var client = factory.CreateClient();
+        var request = new LoginRequest("not-john@example.com", "correct-password");
+
+        var response = await client.PostAsJsonAsync("/api/auth/login", request);
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+
+        var loginResult = await response.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResult);
+        Assert.Null(loginResult.Token);
+    }
+
+
+    #endregion
 }
