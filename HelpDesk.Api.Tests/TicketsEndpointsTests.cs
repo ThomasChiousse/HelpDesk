@@ -380,13 +380,13 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
 
         var loginRequest = new LoginRequest("john@example.com", "correct-password");
-        var response = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        Assert.Equal(HttpStatusCode.OK, loginPostResponse.StatusCode);
 
-        var loginPostResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginPostResponse);
+        var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResponse);
 
-        var token = loginPostResponse.Token;
+        var token = loginResponse.Token;
 
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
@@ -518,7 +518,6 @@ public class TicketsEndpointsTests
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
         int ticketId;
-        int userId;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -526,20 +525,15 @@ public class TicketsEndpointsTests
                 "Printer broken",
                 "The printer doesn't work",
                 TicketPriority.Normal);
-            var user = new User("Thomas", "Banana", "thomas.banana@example.com", UserRole.Technician);
-            await context.Tickets.AddAsync(ticket);
 
-            await context.Users.AddAsync(user);
+            await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
 
             ticketId = ticket.Id;
-            userId = user.Id;
-
         }
 
         var request = new
         {
-            AuthorId = userId,
             Content = "This is a comment"
         };
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", request);
