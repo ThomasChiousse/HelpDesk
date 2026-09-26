@@ -218,19 +218,22 @@ public class TicketsEndpointsTests
     public async Task AssignUser_WithoutToken_ShouldReturnUnauthorized()
     {
         using var factory = new HelpDeskApiFactory();
-        var userId = await SeedUserWithPasswordAsync(factory);
-
         var client = factory.CreateClient();
 
         int ticketId;
+        int userId;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
             Ticket ticket = new("Mouse not mousing", "strange problem with mouse", TicketPriority.Normal);
             await context.Tickets.AddAsync(ticket);
+
+            User user = new("John", "Doe", "john.doe@example.com", UserRole.Administrator);
+
             await context.SaveChangesAsync();
 
             ticketId = ticket.Id;
+            userId = user.Id;
         }
         var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{userId}", null);
         Assert.Equal(HttpStatusCode.Unauthorized, putResponse.StatusCode);
@@ -281,7 +284,7 @@ public class TicketsEndpointsTests
     [Theory]
     [InlineData(UserRole.Technician)]
     [InlineData(UserRole.Administrator)]
-    public async Task AssignUser_WithRightRole_ShouldBeAllowed(UserRole role)
+    public async Task AssignUser_WithAllowedRole_ShouldBeAllowed(UserRole role)
     {
         using var factory = new HelpDeskApiFactory();
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
