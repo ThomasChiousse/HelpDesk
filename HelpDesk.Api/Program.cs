@@ -77,7 +77,10 @@ builder.Services
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CanManageTickets", policy =>
+        policy.RequireRole(["Technician", "Administrator"])
+);
 
 
 var app = builder.Build();

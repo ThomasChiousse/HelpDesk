@@ -63,7 +63,7 @@ public class TicketsController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = ticket.Id }, response);
     }
 
-    [Authorize(Roles = "Technician,Administrator")]
+    [Authorize(Policy = "CanManageTickets")]
     [HttpPut("{ticketId:int}/assignee/{userId:int}")]
     public async Task<IActionResult> AssignUser(int ticketId, int userId, CancellationToken cancellationToken = default)
     {
