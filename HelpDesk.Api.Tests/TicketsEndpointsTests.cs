@@ -19,7 +19,8 @@ public class TicketsEndpointsTests
     private static async Task<int> SeedUserWithPasswordAsync(
     HelpDeskApiFactory factory,
     string email = "john@example.com",
-    string password = "correct-password")
+    string password = "correct-password",
+    UserRole role = UserRole.Technician)
     {
         using var scope = factory.Services.CreateScope();
 
@@ -33,7 +34,7 @@ public class TicketsEndpointsTests
             "John",
             "Doe",
             email,
-            UserRole.Technician);
+            role);
 
         var hash = passwordHasher.Hash(
             user,
@@ -45,6 +46,26 @@ public class TicketsEndpointsTests
         await context.SaveChangesAsync();
 
         return user.Id;
+    }
+
+    private static async Task AuthenticateUserAsync(HelpDeskApiFactory factory, HttpClient client, int userId, string password = "correct-password")
+    {
+        User user;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            user = context.Users.First(u => u.Id == userId);
+        }
+
+        var loginRequest = new LoginRequest(user.Email, password);
+        var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
+        Assert.Equal(HttpStatusCode.OK, loginPostResponse.StatusCode);
+
+        var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(loginResponse);
+
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", loginResponse.Token);
     }
     #endregion
 
@@ -133,77 +154,34 @@ public class TicketsEndpointsTests
     #endregion
 
     #region AssignUser
-    [Fact]
-    public async Task AssignUser_WithValidRequest_ShouldAssignUser()
-    {
-        using var factory = new HelpDeskApiFactory();
-        var client = factory.CreateClient();
-
-        int userId;
-        int ticketId;
-
-        using (var scope = factory.Services.CreateScope())
-        {
-
-            var context = scope.ServiceProvider
-                .GetRequiredService<HelpDeskDbContext>();
-
-            var user = new User(
-                "Thomas",
-                "Banana",
-                "email@domain.com",
-                UserRole.Technician);
-
-            var ticket = new Ticket(
-                "Printer broken",
-                "The printer doesn't work",
-                TicketPriority.Normal);
-
-            context.Users.Add(user);
-            context.Tickets.Add(ticket);
-
-            await context.SaveChangesAsync();
-
-            userId = user.Id;
-            ticketId = ticket.Id;
-
-            Assert.Null(ticket.AssignedUser);
-        }
-
-        var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{userId}", content: null);
-        Assert.Equal(HttpStatusCode.NoContent, putResponse.StatusCode);
-
-        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
-        var ticket2 = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
-
-        Assert.NotNull(ticket2);
-        Assert.NotNull(ticket2.AssignedUser);
-        Assert.Equal(userId, ticket2.AssignedUser.Id);
-    }
 
     [Fact]
     public async Task AssignUser_WithUnknownTicket_ShouldReturnNotFound()
     {
         using var factory = new HelpDeskApiFactory();
-        var client = factory.CreateClient();
+        var userId = await SeedUserWithPasswordAsync(factory);
 
-        int userId;
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int assigneeId;
 
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
 
-            var user = new User(
+            var assignee = new User(
                 "Thomas",
                 "Banana",
                 "email@domain.com",
-                UserRole.Technician);
-            await context.Users.AddAsync(user);
+                UserRole.User);
+            await context.Users.AddAsync(assignee);
             await context.SaveChangesAsync();
-            userId = user.Id;
+
+            assigneeId = assignee.Id;
         }
 
-        var putResponse = await client.PutAsync($"/api/tickets/999/assignee/{userId}", null);
+        var putResponse = await client.PutAsync($"/api/tickets/999/assignee/{assigneeId}", null);
         Assert.Equal(HttpStatusCode.NotFound, putResponse.StatusCode);
     }
 
@@ -211,7 +189,10 @@ public class TicketsEndpointsTests
     public async Task AssignUser_WithUnknownUser_ShouldReturnNotFound()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         int ticketId;
 
@@ -232,6 +213,118 @@ public class TicketsEndpointsTests
         var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/999", null);
         Assert.Equal(HttpStatusCode.NotFound, putResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task AssignUser_WithoutToken_ShouldReturnUnauthorized()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
+        var client = factory.CreateClient();
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new("Mouse not mousing", "strange problem with mouse", TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+        }
+        var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{userId}", null);
+        Assert.Equal(HttpStatusCode.Unauthorized, putResponse.StatusCode);
+
+        var ticketReponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, ticketReponse.StatusCode);
+        var persistedTicket = await ticketReponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(persistedTicket);
+        Assert.Null(persistedTicket.AssignedUser);
+    }
+
+    [Fact]
+    public async Task AssignUser_WithUserRole_ShouldReturnForbidden()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        int assigneeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new("Mouse not mousing", "strange problem with mouse", TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+
+            User user = new("Assignee", "Assignee's Lastname", "assignee@example.com", UserRole.User);
+            await context.Users.AddAsync(user);
+
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+            assigneeId = user.Id;
+        }
+
+        var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{assigneeId}", null);
+        Assert.Equal(HttpStatusCode.Forbidden, putResponse.StatusCode);
+
+        var ticketReponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, ticketReponse.StatusCode);
+        var persistedTicket = await ticketReponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(persistedTicket);
+        Assert.Null(persistedTicket.AssignedUser);
+    }
+
+    [Theory]
+    [InlineData(UserRole.Technician)]
+    [InlineData(UserRole.Administrator)]
+    public async Task AssignUser_WithRightRole_ShouldBeAllowed(UserRole role)
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: role);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        int assigneeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new("Mouse not mousing", "strange problem with mouse", TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+
+            User user = new("Assignee", "Assignee's Lastname", "assignee@example.com", UserRole.User);
+            await context.Users.AddAsync(user);
+
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+            assigneeId = user.Id;
+        }
+
+        var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{assigneeId}", null);
+        Assert.Equal(HttpStatusCode.NoContent, putResponse.StatusCode);
+
+        var ticketReponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, ticketReponse.StatusCode);
+        var persistedTicket = await ticketReponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(persistedTicket);
+        Assert.NotNull(persistedTicket.AssignedUser);
+        Assert.Equal(assigneeId, persistedTicket.AssignedUser.Id);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var user = context.Users.First(u => u.Id == assigneeId);
+            Assert.Equal(user.Firstname, persistedTicket.AssignedUser.Firstname);
+            Assert.Equal(user.Lastname, persistedTicket.AssignedUser.Lastname);
+        }
+    }
+
     #endregion
 
     #region UnassignUser
@@ -377,19 +470,9 @@ public class TicketsEndpointsTests
     {
         using var factory = new HelpDeskApiFactory();
         var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
-
-        var loginRequest = new LoginRequest("john@example.com", "correct-password");
-        var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
-        Assert.Equal(HttpStatusCode.OK, loginPostResponse.StatusCode);
-
-        var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginResponse);
-
-        var token = loginResponse.Token;
-
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        await AuthenticateUserAsync(factory, client, userId);
 
         int ticketId;
         using (var scope = factory.Services.CreateScope())
@@ -436,20 +519,10 @@ public class TicketsEndpointsTests
     public async Task AddComment_WithUnknownTicket_ShouldReturnNotFound()
     {
         using var factory = new HelpDeskApiFactory();
-        await SeedUserWithPasswordAsync(factory);
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
-
-        var loginRequest = new LoginRequest("john@example.com", "correct-password");
-        var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
-        Assert.Equal(HttpStatusCode.OK, loginPostResponse.StatusCode);
-
-        var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginResponse);
-
-        var token = loginResponse.Token;
-
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        await AuthenticateUserAsync(factory, client, userId);
 
         var request = new
         {
@@ -463,9 +536,13 @@ public class TicketsEndpointsTests
     public async Task AddComment_ToClosedTicket_ShouldReturnConflict()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         int ticketId;
-        await SeedUserWithPasswordAsync(factory);
+
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -483,18 +560,6 @@ public class TicketsEndpointsTests
 
             ticketId = ticket.Id;
         }
-
-        var loginRequest = new LoginRequest("john@example.com", "correct-password");
-        var loginPostResponse = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
-        Assert.Equal(HttpStatusCode.OK, loginPostResponse.StatusCode);
-
-        var loginResponse = await loginPostResponse.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginResponse);
-
-        var token = loginResponse.Token;
-
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
 
         var request = new
         {
@@ -548,19 +613,9 @@ public class TicketsEndpointsTests
         using var factory = new HelpDeskApiFactory();
         var userId1 = await SeedUserWithPasswordAsync(factory);
         var userId2 = await SeedUserWithPasswordAsync(factory, "jane@example.com", "second-password");
+
         var client = factory.CreateClient();
-
-        var loginRequest = new LoginRequest("john@example.com", "correct-password");
-        var response = await client.PostAsJsonAsync("/api/auth/login", loginRequest);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-        Assert.NotNull(loginResponse);
-
-        var token = loginResponse.Token;
-
-        client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", token);
+        await AuthenticateUserAsync(factory, client, userId1);
 
         int ticketId;
         using (var scope = factory.Services.CreateScope())
@@ -586,7 +641,6 @@ public class TicketsEndpointsTests
         Assert.NotNull(commentResponse);
         Assert.NotEqual(userId2, commentResponse.Author.Id);
         Assert.Equal(userId1, commentResponse.Author.Id);
-
     }
     #endregion
 

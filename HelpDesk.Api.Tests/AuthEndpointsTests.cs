@@ -45,7 +45,9 @@ public class AuthEndpointsTests
 
     private static async Task<int> SeedUserWithPasswordAsync(
     HelpDeskApiFactory factory,
-    string password = "correct-password")
+    string email = "john@example.com",
+    string password = "correct-password",
+    UserRole role = UserRole.Technician)
     {
         using var scope = factory.Services.CreateScope();
 
@@ -58,8 +60,8 @@ public class AuthEndpointsTests
         var user = new User(
             "John",
             "Doe",
-            "john@example.com",
-            UserRole.Technician);
+            email,
+            role);
 
         var hash = passwordHasher.Hash(
             user,
