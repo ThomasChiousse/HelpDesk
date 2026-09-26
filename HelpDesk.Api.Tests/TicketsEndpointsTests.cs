@@ -336,7 +336,7 @@ public class TicketsEndpointsTests
     [Theory]
     [InlineData(UserRole.Administrator)]
     [InlineData(UserRole.Technician)]
-    public async Task UnassignUser_WithAllowedUser_ShouldUnassignUser(UserRole role)
+    public async Task UnassignUser_WithAllowedRole_ShouldUnassignUser(UserRole role)
     {
         using var factory = new HelpDeskApiFactory();
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
@@ -376,9 +376,8 @@ public class TicketsEndpointsTests
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
-
-
         Assert.NotNull(ticketFromDb);
         Assert.Null(ticketFromDb.AssignedUser);
     }
@@ -426,6 +425,53 @@ public class TicketsEndpointsTests
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
 
+        Assert.NotNull(ticketFromDb);
+        Assert.NotNull(ticketFromDb.AssignedUser);
+        Assert.Equal(assigneeId, ticketFromDb.AssignedUser.Id);
+    }
+
+    [Fact]
+    public async Task UnassignUser_WithoutToken_ShouldReturnUnauthorized()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
+        var client = factory.CreateClient();
+
+        int ticketId, assigneeId;
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+
+            var assignee = new User(
+                "Thomas",
+                "Banana",
+                "email@domain.com",
+                UserRole.User);
+
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+
+            ticket.AssignUser(assignee);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.Users.AddAsync(assignee);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+            assigneeId = assignee.Id;
+        }
+
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{assigneeId}");
+        Assert.Equal(HttpStatusCode.Unauthorized, deleteResponse.StatusCode);
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(ticketFromDb);
         Assert.NotNull(ticketFromDb.AssignedUser);
         Assert.Equal(assigneeId, ticketFromDb.AssignedUser.Id);
