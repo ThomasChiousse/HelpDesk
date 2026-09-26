@@ -229,6 +229,7 @@ public class TicketsEndpointsTests
             await context.Tickets.AddAsync(ticket);
 
             User user = new("John", "Doe", "john.doe@example.com", UserRole.Administrator);
+            await context.Users.AddAsync(user);
 
             await context.SaveChangesAsync();
 
