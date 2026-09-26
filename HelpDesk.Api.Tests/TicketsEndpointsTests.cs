@@ -434,7 +434,7 @@ public class TicketsEndpointsTests
     public async Task UnassignUser_WithoutToken_ShouldReturnUnauthorized()
     {
         using var factory = new HelpDeskApiFactory();
-        var userId = await SeedUserWithPasswordAsync(factory);
+        await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
 
@@ -758,11 +758,17 @@ public class TicketsEndpointsTests
     #endregion
 
     #region AdvanceStatus
-    [Fact]
-    public async Task AdvanceStatus_WithValidRequest_ShouldAdvanceStatus()
+    [Theory]
+    [InlineData(UserRole.Administrator)]
+    [InlineData(UserRole.Technician)]
+    public async Task AdvanceStatus_WithAllowedRole_ShouldAdvanceStatus(UserRole role)
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: role);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         int ticketId;
         using (var scope = factory.Services.CreateScope())
         {
@@ -788,10 +794,67 @@ public class TicketsEndpointsTests
     }
 
     [Fact]
-    public async Task AdvanceStatus_WhenTicketIsAlreadyClosed_ShouldReturnConflict()
+    public async Task AdvanceStatus_AsSimpleUser_ShouldReturnForbidden()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+        var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
+        Assert.Equal(HttpStatusCode.Forbidden, patchResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task AdvanceStatus_WithoutToken_ShouldReturnUnauthorized()
     {
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new("Mouse broken", "No more scrolling", TicketPriority.High);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var patchReponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
+        Assert.Equal(HttpStatusCode.Unauthorized, patchReponse.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket persistedTicket = context.Tickets.First(t => t.Id == ticketId);
+            Assert.Equal(TicketStatus.Open, persistedTicket.Status);
+        }
+    }
+
+    [Fact]
+    public async Task AdvanceStatus_WhenTicketIsAlreadyClosed_ShouldReturnConflict()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         int ticketId;
         using (var scope = factory.Services.CreateScope())
         {
@@ -821,7 +884,11 @@ public class TicketsEndpointsTests
     public async Task AdvanceStatus_WithUnknownTicket_ShouldReturnNotFound()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         var patchResponse = await client.PatchAsync($"/api/tickets/999/status", null);
         Assert.Equal(HttpStatusCode.NotFound, patchResponse.StatusCode);
     }

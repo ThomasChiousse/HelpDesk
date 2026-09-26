@@ -99,6 +99,7 @@ public class TicketsController : ControllerBase
         return StatusCode(StatusCodes.Status201Created, response);
     }
 
+    [Authorize(Policy = "CanManageTickets")]
     [HttpPatch("{ticketId:int}/status")]
     public async Task<ActionResult<TicketStatusResponse>> AdvanceStatus(int ticketId, CancellationToken cancellationToken = default)
     {
