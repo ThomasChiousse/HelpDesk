@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Data;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -434,8 +433,6 @@ public class TicketsEndpointsTests
     public async Task UnassignUser_WithoutToken_ShouldReturnUnauthorized()
     {
         using var factory = new HelpDeskApiFactory();
-        await SeedUserWithPasswordAsync(factory);
-
         var client = factory.CreateClient();
 
         int ticketId, assigneeId;
@@ -816,6 +813,15 @@ public class TicketsEndpointsTests
         }
         var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
         Assert.Equal(HttpStatusCode.Forbidden, patchResponse.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+
+            var persistedTicket = context.Tickets.First(t => t.Id == ticketId);
+
+            Assert.Equal(TicketStatus.Open, persistedTicket.Status);
+        }
     }
 
     [Fact]
@@ -835,8 +841,8 @@ public class TicketsEndpointsTests
             ticketId = ticket.Id;
         }
 
-        var patchReponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
-        Assert.Equal(HttpStatusCode.Unauthorized, patchReponse.StatusCode);
+        var patchResponse = await client.PatchAsync($"/api/tickets/{ticketId}/status", null);
+        Assert.Equal(HttpStatusCode.Unauthorized, patchResponse.StatusCode);
 
         using (var scope = factory.Services.CreateScope())
         {
