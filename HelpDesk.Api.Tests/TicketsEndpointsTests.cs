@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Data;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -332,40 +333,45 @@ public class TicketsEndpointsTests
     #endregion
 
     #region UnassignUser
-    [Fact]
-    public async Task UnassignUser_WithValidData_ShouldUnassignUser()
+    [Theory]
+    [InlineData(UserRole.Administrator)]
+    [InlineData(UserRole.Technician)]
+    public async Task UnassignUser_WithAllowedUser_ShouldUnassignUser(UserRole role)
     {
         using var factory = new HelpDeskApiFactory();
-        var client = factory.CreateClient();
+        var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
-        int ticketId, userId;
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId, assigneeId;
 
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
 
-            var user = new User(
+            var assignee = new User(
                 "Thomas",
                 "Banana",
                 "email@domain.com",
-                UserRole.Technician);
+                UserRole.User);
 
             var ticket = new Ticket(
                 "Printer broken",
                 "The printer doesn't work",
                 TicketPriority.Normal);
 
-            ticket.AssignUser(user);
+            ticket.AssignUser(assignee);
 
             await context.Tickets.AddAsync(ticket);
-            await context.Users.AddAsync(user);
+            await context.Users.AddAsync(assignee);
             await context.SaveChangesAsync();
 
             ticketId = ticket.Id;
-            userId = user.Id;
+            assigneeId = assignee.Id;
         }
 
-        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{userId}");
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{assigneeId}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
@@ -378,46 +384,96 @@ public class TicketsEndpointsTests
     }
 
     [Fact]
-    public async Task UnassignUser_WhenUserIsNotAssigned_ShouldReturnConflict()
+    public async Task UnassignUser_WithSimpleUser_ShouldReturnForbidden()
     {
         using var factory = new HelpDeskApiFactory();
-        var client = factory.CreateClient();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
-        int ticketId, user1Id, user2Id;
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId, assigneeId;
+
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
 
-            var user1 = new User(
+            var assignee = new User(
                 "Thomas",
                 "Banana",
                 "email@domain.com",
-                UserRole.Technician);
-
-            var user2 = new User(
-                "Tom",
-                "Ban",
-                "email2@domain.com",
-                UserRole.Technician);
+                UserRole.User);
 
             var ticket = new Ticket(
                 "Printer broken",
                 "The printer doesn't work",
                 TicketPriority.Normal);
 
-            ticket.AssignUser(user1);
+            ticket.AssignUser(assignee);
 
             await context.Tickets.AddAsync(ticket);
-            await context.Users.AddAsync(user1);
-            await context.Users.AddAsync(user2);
+            await context.Users.AddAsync(assignee);
             await context.SaveChangesAsync();
 
             ticketId = ticket.Id;
-            user1Id = user1.Id;
-            user2Id = user2.Id;
+            assigneeId = assignee.Id;
         }
 
-        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{user2Id}");
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{assigneeId}");
+        Assert.Equal(HttpStatusCode.Forbidden, deleteResponse.StatusCode);
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+
+        Assert.NotNull(ticketFromDb);
+        Assert.NotNull(ticketFromDb.AssignedUser);
+        Assert.Equal(assigneeId, ticketFromDb.AssignedUser.Id);
+    }
+
+    [Fact]
+    public async Task UnassignUser_WhenUserIsNotAssigned_ShouldReturnConflict()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId, fakeAssigneeId, assigneeId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+
+            var fakeAssignee = new User(
+                "Thomas",
+                "Banana",
+                "email@domain.com",
+                UserRole.Technician);
+
+            var assignee = new User(
+                "John",
+                "Doe",
+                "email@example.com",
+                UserRole.User);
+
+            var ticket = new Ticket(
+                "Printer broken",
+                "The printer doesn't work",
+                TicketPriority.Normal);
+
+            ticket.AssignUser(assignee);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.Users.AddRangeAsync([fakeAssignee, assignee]);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+            fakeAssigneeId = fakeAssignee.Id;
+            assigneeId = assignee.Id;
+        }
+
+        var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{fakeAssigneeId}");
         Assert.Equal(HttpStatusCode.Conflict, deleteResponse.StatusCode);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
@@ -426,14 +482,18 @@ public class TicketsEndpointsTests
 
         Assert.NotNull(ticketFromDb);
         Assert.NotNull(ticketFromDb.AssignedUser);
-        Assert.Equal(user1Id, ticketFromDb.AssignedUser.Id);
+        Assert.Equal(assigneeId, ticketFromDb.AssignedUser.Id);
+        Assert.NotEqual(fakeAssigneeId, ticketFromDb.AssignedUser.Id);
     }
 
     [Fact]
     public async Task UnassignUser_WhenTicketHasNoAssignedUser_ShouldReturnConflict()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         int ticketId;
         Ticket ticket;
@@ -461,7 +521,10 @@ public class TicketsEndpointsTests
     public async Task UnassignUser_WithUnknownTicket_ShouldReturnNotFound()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         var deleteResponse = await client.DeleteAsync($"/api/tickets/999/assignee/999");
         Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);

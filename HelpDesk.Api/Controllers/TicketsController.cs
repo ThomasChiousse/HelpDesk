@@ -71,6 +71,7 @@ public class TicketsController : ControllerBase
         return NoContent();
     }
 
+    [Authorize(Policy = "CanManageTickets")]
     [HttpDelete("{ticketId:int}/assignee/{userId:int}")]
     public async Task<IActionResult> UnassignUser(int ticketId, int userId, CancellationToken cancellationToken = default)
     {
