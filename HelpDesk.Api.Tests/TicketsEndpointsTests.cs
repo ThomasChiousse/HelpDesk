@@ -240,6 +240,11 @@ public class TicketsEndpointsTests
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+        var response = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+
+        Assert.NotNull(response);
+        Assert.Equal(ticketId, response.Id);
     }
 
     [Fact]
@@ -260,6 +265,7 @@ public class TicketsEndpointsTests
             var ticket = new Ticket(
                 "A title", "A description", TicketPriority.Normal, requester: requester);
             await context.Tickets.AddAsync(ticket);
+            await context.Users.AddAsync(requester);
             await context.SaveChangesAsync();
 
             ticketId = ticket.Id;
@@ -289,6 +295,7 @@ public class TicketsEndpointsTests
             var ticket = new Ticket(
                 "A title", "A description", TicketPriority.Normal, requester: requester);
             await context.Tickets.AddAsync(ticket);
+            await context.Users.AddAsync(requester);
             await context.SaveChangesAsync();
 
             ticketId = ticket.Id;
