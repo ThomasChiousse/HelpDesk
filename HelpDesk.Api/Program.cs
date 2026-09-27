@@ -81,9 +81,7 @@ builder.Services
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("CanManageTickets", policy =>
-        policy.RequireRole(["Technician", "Administrator"]));
-
-builder.Services.AddAuthorizationBuilder()
+        policy.RequireRole(["Technician", "Administrator"]))
     .AddPolicy("CanViewTicket", policy =>
         policy.AddRequirements(new CanViewTicketRequirement()));
 

@@ -4,26 +4,29 @@ using System.Security.Claims;
 
 namespace HelpDesk.Api.Authorization;
 
-public class CanViewTicketHandler : AuthorizationHandler<CanViewTicketRequirement>
+public class CanViewTicketHandler : AuthorizationHandler<CanViewTicketRequirement, Ticket>
 {
     protected override Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
-        CanViewTicketRequirement requirement)
+        CanViewTicketRequirement requirement,
+        Ticket ticket)
     {
-        var currentUserRole = context.User.FindFirstValue(ClaimTypes.Role);
-        if (currentUserRole == "Administrator" || currentUserRole == "Technician")
+        if (context.User.IsInRole(nameof(UserRole.Administrator))
+            || context.User.IsInRole(nameof(UserRole.Technician)))
+        {
+            context.Succeed(requirement);
+            return Task.CompletedTask;
+        }
+
+        if (context.User.IsInRole(nameof(UserRole.User))
+            && int.TryParse(
+                context.User.FindFirstValue(ClaimTypes.NameIdentifier),
+                out var currentUserId)
+            && ticket.Requester?.Id == currentUserId)
         {
             context.Succeed(requirement);
         }
-        else if (currentUserRole == "User")
-        {
-            var ticket = context.Resource as Ticket;
-            var currentUserId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (ticket?.Requester?.Id.ToString() == currentUserId)
-            {
-                context.Succeed(requirement);
-            }
-        }
+
         return Task.CompletedTask;
     }
 }
