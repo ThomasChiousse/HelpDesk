@@ -13,6 +13,7 @@ public class Ticket
     public User? AssignedUser { get; private set; }
     private readonly List<Comment> _comments = [];
     public IReadOnlyCollection<Comment> Comments => _comments.AsReadOnly();
+    public User? Requester { get; private set; }
 
     public Ticket(int id, string title, string description, TicketPriority priority, User? assignedUser = null)
     {
@@ -28,7 +29,7 @@ public class Ticket
         AssignedUser = assignedUser;
     }
 
-    public Ticket(string title, string description, TicketPriority priority, User? assignedUser = null)
+    public Ticket(string title, string description, TicketPriority priority, User? assignedUser = null, User? requester = null)
     {
 
         if (!IsTitleValid(title)) throw new ArgumentException("Title cannot be null, empty or whitespace.", nameof(title));

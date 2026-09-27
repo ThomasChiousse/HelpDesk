@@ -50,7 +50,12 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var ticket = await _ticketCreationService.CreateAsync(request.Title, request.Description, priority, cancellationToken);
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int requesterId))
+        {
+            return Unauthorized();
+        }
+
+        var ticket = await _ticketCreationService.CreateAsync(request.Title, request.Description, priority, requesterId, cancellationToken);
 
         var response = new TicketDetailsResponse(
             ticket.Id,

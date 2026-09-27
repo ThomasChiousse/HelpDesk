@@ -9,9 +9,9 @@ namespace HelpDesk.Tests.ServicesTests
         [Fact]
         public async Task CreateAsync_WithValidData_ShouldCreateTicket()
         {
-            var repository = new FakeTicketRepository();
-
-            var service = new TicketCreationService(repository);
+            var ticketRepository = new FakeTicketRepository();
+            var userRepository = new FakeUserRepository();
+            var service = new TicketCreationService(ticketRepository, userRepository);
 
             const string title = "Keyboard broken";
             const string description = "Several keys do not work";
@@ -24,16 +24,17 @@ namespace HelpDesk.Tests.ServicesTests
             Assert.Equal(priority, ticket.Priority);
             Assert.Equal(TicketStatus.Open, ticket.Status);
 
-            Assert.True(repository.Contains(ticket));
-            Assert.True(repository.SaveChangesCalled);
+            Assert.True(ticketRepository.Contains(ticket));
+            Assert.True(ticketRepository.SaveChangesCalled);
         }
 
         [Fact]
         public async Task CreateAsync_WithInvalidPriority_ShouldThrowArgumentException()
         {
             // Arrange
-            var repository = new FakeTicketRepository();
-            var service = new TicketCreationService(repository);
+            var ticketRepository = new FakeTicketRepository();
+            var userRepository = new FakeUserRepository();
+            var service = new TicketCreationService(ticketRepository, userRepository);
 
             var invalidPriority = (TicketPriority)999;
 
@@ -44,8 +45,8 @@ namespace HelpDesk.Tests.ServicesTests
                     "Description",
                     invalidPriority));
 
-            Assert.False(repository.SaveChangesCalled);
-            Assert.Equal(0, repository.Count());
+            Assert.False(ticketRepository.SaveChangesCalled);
+            Assert.Equal(0, ticketRepository.Count());
         }
     }
 }
