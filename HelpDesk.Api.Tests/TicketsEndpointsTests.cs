@@ -7,7 +7,6 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using System.Data;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -958,8 +957,37 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
-        var updateResponse = await client.PutAsync($"/api/tickets/{999}", null);
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new("Old Title", "Old Description", TicketPriority.Normal);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+        }
+
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest);
         Assert.Equal(HttpStatusCode.Forbidden, updateResponse.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket persistedTicket = context.Tickets.First(t => t.Id == ticketId);
+
+            Assert.Equal("Old Title", persistedTicket.Title);
+            Assert.Equal("Old Description", persistedTicket.Description);
+            Assert.Equal(TicketPriority.Normal, persistedTicket.Priority);
+        }
     }
 
     [Fact]
@@ -968,8 +996,37 @@ public class TicketsEndpointsTests
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
 
-        var updateResponse = await client.PutAsync($"/api/tickets/{999}", null);
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new("Old Title", "Old Description", TicketPriority.Normal);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+        }
+
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{999}", updateRequest);
         Assert.Equal(HttpStatusCode.Unauthorized, updateResponse.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket persistedTicket = context.Tickets.First(t => t.Id == ticketId);
+
+            Assert.Equal("Old Title", persistedTicket.Title);
+            Assert.Equal("Old Description", persistedTicket.Description);
+            Assert.Equal(TicketPriority.Normal, persistedTicket.Priority);
+        }
     }
 
     [Fact]
@@ -1252,9 +1309,20 @@ public class TicketsEndpointsTests
             await context.SaveChangesAsync();
             ticketId = ticket.Id;
         }
-        var patchRequest = new PatchTicketRequest();
+        var patchRequest = new PatchTicketRequest
+        {
+            Title = "New Title"
+        };
         var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.Unauthorized, patchResponse.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket persistedTicket = context.Tickets.First(t => t.Id == ticketId);
+            Assert.Equal("Old Title", persistedTicket.Title);
+        }
+
     }
 
     [Theory]
