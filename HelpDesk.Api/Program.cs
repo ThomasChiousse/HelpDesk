@@ -1,3 +1,4 @@
+using HelpDesk.Api.Authorization;
 using HelpDesk.Api.ExceptionHandling;
 using HelpDesk.Application.Authentication;
 using HelpDesk.Application.Repositories;
@@ -6,6 +7,7 @@ using HelpDesk.Infrastructure.Authentication;
 using HelpDesk.Infrastructure.Persistence;
 using HelpDesk.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -79,9 +81,13 @@ builder.Services
 
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("CanManageTickets", policy =>
-        policy.RequireRole(["Technician", "Administrator"])
-);
+        policy.RequireRole(["Technician", "Administrator"]));
 
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CanViewTicket", policy =>
+        policy.AddRequirements(new CanViewTicketRequirement()));
+
+builder.Services.AddSingleton<IAuthorizationHandler, CanViewTicketHandler>();
 
 var app = builder.Build();
 

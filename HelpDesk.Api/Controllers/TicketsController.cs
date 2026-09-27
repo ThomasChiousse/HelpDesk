@@ -20,8 +20,10 @@ public class TicketsController : ControllerBase
     private readonly TicketStatusService _ticketStatusService;
     private readonly TicketUpdateService _ticketUpdateService;
     private readonly TicketPatchService _ticketPatchService;
+    private readonly IAuthorizationService _authorizationService;
     public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService,
-        TicketCommentService ticketCommentService, TicketStatusService ticketStatusService, TicketUpdateService ticketUpdateService, TicketPatchService ticketPatchService)
+        TicketCommentService ticketCommentService, TicketStatusService ticketStatusService, TicketUpdateService ticketUpdateService, TicketPatchService ticketPatchService,
+        IAuthorizationService authorizationService)
     {
         _ticketQueryService = ticketQueryService;
         _ticketCreationService = ticketCreationService;
@@ -30,12 +32,22 @@ public class TicketsController : ControllerBase
         _ticketStatusService = ticketStatusService;
         _ticketUpdateService = ticketUpdateService;
         _ticketPatchService = ticketPatchService;
+        _authorizationService = authorizationService;
     }
 
     [HttpGet("{id:int}")]
     public async Task<ActionResult<TicketDetailsResponse>> GetById(int id, CancellationToken cancellationToken = default)
     {
         var ticket = await _ticketQueryService.GetByIdAsync(id, cancellationToken);
+
+        var authorizationResult = await _authorizationService.AuthorizeAsync(
+            User, ticket, "CanViewTicket");
+
+        if (!authorizationResult.Succeeded)
+        {
+            return Forbid();
+        }
+
         return Ok(ticket.ToDetailsResponse());
     }
 

@@ -42,6 +42,7 @@ public class TicketRepository : ITicketRepository
         return await _context.Tickets
             .AsNoTracking()
             .Include(t => t.AssignedUser)
+            .Include(t => t.Requester)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 

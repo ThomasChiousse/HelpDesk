@@ -324,7 +324,10 @@ public class TicketsEndpointsTests
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            Ticket ticket = new("Mouse not mousing", "strange problem with mouse", TicketPriority.Normal);
+
+            User requester = await context.Users.SingleAsync(u => u.Id == userId);
+
+            Ticket ticket = new("Mouse not mousing", "strange problem with mouse", TicketPriority.Normal, requester: requester);
             await context.Tickets.AddAsync(ticket);
 
             User user = new("Assignee", "Assignee's Lastname", "assignee@example.com", UserRole.User);
@@ -460,6 +463,8 @@ public class TicketsEndpointsTests
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
 
+            var requester = await context.Users.SingleAsync(u => u.Id == userId);
+
             var assignee = new User(
                 "Thomas",
                 "Banana",
@@ -469,7 +474,7 @@ public class TicketsEndpointsTests
             var ticket = new Ticket(
                 "Printer broken",
                 "The printer doesn't work",
-                TicketPriority.Normal);
+                TicketPriority.Normal, requester: requester);
 
             ticket.AssignUser(assignee);
 
