@@ -38,6 +38,7 @@ public class TicketsController : ControllerBase
         return Ok(ticket.ToDetailsResponse());
     }
 
+    [Authorize]
     [HttpPost]
     public async Task<ActionResult<TicketDetailsResponse>> Create(CreateTicketRequest request, CancellationToken cancellationToken = default)
     {

@@ -70,13 +70,19 @@ public class TicketsEndpointsTests
     #endregion
 
     #region PostTicket
-    [Fact]
-    public async Task PostTicket_WithValidRequest_ShouldReturnCreated()
+    [Theory]
+    [InlineData(UserRole.User)]
+    [InlineData(UserRole.Administrator)]
+    [InlineData(UserRole.Technician)]
+    public async Task PostTicket_WithAuthenticatedUser_ShouldReturnCreated(UserRole role)
     {
         // arrange
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         var request = new
         {
             title = "Keyboard broken",
@@ -87,27 +93,51 @@ public class TicketsEndpointsTests
         // act
         var response = await client.PostAsJsonAsync("/api/tickets", request);
 
-        var ticket = await response.Content.ReadFromJsonAsync<TicketDetailsResponse>();
-
-        // assert
-        Assert.NotNull(ticket);
-        Assert.True(ticket.Id > 0);
-        Assert.Equal("Keyboard broken", ticket.Title);
-        Assert.Equal("Several keys do not work", ticket.Description);
-        Assert.Equal("High", ticket.Priority);
-        Assert.Equal("Open", ticket.Status);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        Assert.NotNull(response.Headers.Location);
-        Assert.EndsWith($"/api/tickets/{ticket.Id}", response.Headers.Location.ToString());
 
-        var getResponse = await client.GetAsync($"/api/tickets/{ticket?.Id}");
-        var retrievedTicket = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        var createdTicket = await response.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(createdTicket);
+        Assert.True(createdTicket.Id > 0);
+        Assert.Equal("Keyboard broken", createdTicket.Title);
+        Assert.Equal("Several keys do not work", createdTicket.Description);
+        Assert.Equal("High", createdTicket.Priority);
+        Assert.Equal("Open", createdTicket.Status);
+
+        Assert.NotNull(response.Headers.Location);
+        Assert.EndsWith($"/api/tickets/{createdTicket.Id}", response.Headers.Location.ToString());
+
+        var getResponse = await client.GetAsync($"/api/tickets/{createdTicket?.Id}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+        var retrievedTicket = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(retrievedTicket);
 
-        Assert.Equal(ticket.Id, retrievedTicket.Id);
-        Assert.Equal(ticket.Title, retrievedTicket.Title);
+        Assert.Equal(createdTicket.Id, retrievedTicket.Id);
+        Assert.Equal(createdTicket.Title, retrievedTicket.Title);
+    }
 
+    [Fact]
+    public async Task PostTicket_WithoutToken_ShouldReturnUnauthorized()
+    {
+        using var factory = new HelpDeskApiFactory();
+
+        var client = factory.CreateClient();
+
+        var request = new
+        {
+            title = "Keyboard broken",
+            description = "Several keys do not work",
+            priority = "High"
+        };
+
+        var postResponse = await client.PostAsJsonAsync("/api/tickets", request);
+        Assert.Equal(HttpStatusCode.Unauthorized, postResponse.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Assert.Empty(context.Tickets);
+        }
     }
 
     [Theory]
@@ -117,7 +147,11 @@ public class TicketsEndpointsTests
     public async Task PostTicket_WithInvalidPriority_ShouldReturnBadRequest(string priority)
     {
         using var factory = new HelpDeskApiFactory();
+        int userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         var request = new
         {
             title = "Keyboard",
@@ -126,8 +160,13 @@ public class TicketsEndpointsTests
         };
 
         var response = await client.PostAsJsonAsync("/api/tickets", request);
-
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Assert.Empty(context.Tickets);
+        }
     }
     #endregion
 
