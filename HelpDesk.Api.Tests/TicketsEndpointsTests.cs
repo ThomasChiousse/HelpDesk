@@ -881,8 +881,6 @@ public class TicketsEndpointsTests
         Assert.Equal(HttpStatusCode.Unauthorized, postResponse.StatusCode);
     }
 
-
-
     [Fact]
     public async Task AddComment_WithDifferentAuthorIdInBody_ShouldNotAllowImpersonation()
     {
@@ -917,6 +915,36 @@ public class TicketsEndpointsTests
         Assert.NotNull(commentResponse);
         Assert.NotEqual(userId2, commentResponse.Author.Id);
         Assert.Equal(userId1, commentResponse.Author.Id);
+    }
+
+    [Fact]
+    public async Task AddComment_AsDifferentUser_ShouldReturnForbidden()
+    {
+        using var factory = new HelpDeskApiFactory();
+        int userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var requester = new User("Reeee", "Quester", "requester@example.com", UserRole.User);
+            var ticket = new Ticket("Screen problem", "Screen only shows black&white", TicketPriority.Normal, requester: requester);
+            await context.Tickets.AddAsync(ticket);
+            await context.Users.AddAsync(requester);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+        }
+        var commentRequest = new CreateCommentRequest
+        {
+            Content = "Started taking care of this ticket"
+        };
+
+        var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", commentRequest);
+        Assert.Equal(HttpStatusCode.Forbidden, postResponse.StatusCode);
     }
     #endregion
 
@@ -2542,14 +2570,19 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
+        int ticketId;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            await context.Tickets.AddAsync(new Ticket("Some title", "Some description", TicketPriority.High));
+            var requester = await context.Users.SingleAsync(u => u.Id == userId);
+            var ticket = new Ticket("Some title", "Some description", TicketPriority.High, requester: requester);
+            await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
         }
 
-        var response = await client.GetAsync($"/api/tickets/1/comments");
+        var response = await client.GetAsync($"/api/tickets/{ticketId}/comments");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var commentPagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
         Assert.NotNull(commentPagedResponse);
@@ -2594,6 +2627,32 @@ public class TicketsEndpointsTests
 
         var response = await client.GetAsync($"/api/tickets/{ticketId}/comments");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetComments_AsDifferentUser_ShouldReturnForbidden()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var requester = new User("Requester", "Lastnamio", "requester@example.com", UserRole.User);
+            var ticket = new Ticket("Some title", "Some description", TicketPriority.High, requester: requester);
+            await context.Tickets.AddAsync(ticket);
+            await context.Users.AddAsync(requester);
+            await context.SaveChangesAsync();
+
+            ticketId = ticket.Id;
+        }
+
+        var response = await client.GetAsync($"/api/tickets/{ticketId}/comments");
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
     #endregion
 }

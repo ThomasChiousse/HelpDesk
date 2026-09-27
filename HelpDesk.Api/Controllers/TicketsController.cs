@@ -107,6 +107,14 @@ public class TicketsController : ControllerBase
             return Unauthorized();
         }
 
+        var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
+
+        var authorizationResult = await _authorizationService.AuthorizeAsync(User, ticket, "CanViewTicket");
+        if (!authorizationResult.Succeeded)
+        {
+            return Forbid();
+        }
+
         var comment = await _ticketCommentService.AddCommentAsync(ticketId, userId, request.Content, cancellationToken);
         var response = new CommentResponse(
             comment.Id,
@@ -114,6 +122,30 @@ public class TicketsController : ControllerBase
             comment.CreationDate,
             new UserResponse(comment.Author.Id, comment.Author.Firstname, comment.Author.Lastname));
         return StatusCode(StatusCodes.Status201Created, response);
+    }
+
+    [HttpGet("{ticketId}/comments")]
+    public async Task<ActionResult<PagedResponse<CommentResponse>>> GetComments(
+        int ticketId, [FromQuery] GetCommentsRequest request, CancellationToken cancellationToken = default)
+    {
+        var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
+
+        var authorizationResult = await _authorizationService.AuthorizeAsync(User, ticket, "CanViewTicket");
+        if (!authorizationResult.Succeeded)
+        {
+            return Forbid();
+        }
+
+        var result = await _ticketQueryService.GetCommentsPagedAsync(ticketId, request.Page, request.PageSize, cancellationToken);
+
+        var items = result.Items.Select(c => new CommentResponse(
+            c.Id,
+            c.Content,
+            c.CreationDate,
+            new UserResponse(c.Author.Id, c.Author.Firstname, c.Author.Lastname)
+            )).ToList();
+        var response = new PagedResponse<CommentResponse>(items, request.Page, request.PageSize, result.TotalCount);
+        return Ok(response);
     }
 
     [Authorize(Policy = "CanManageTickets")]
@@ -213,19 +245,5 @@ public class TicketsController : ControllerBase
         return Ok(response);
     }
 
-    [HttpGet("{ticketId}/comments")]
-    public async Task<ActionResult<PagedResponse<CommentResponse>>> GetComments(
-        int ticketId, [FromQuery] GetCommentsRequest request, CancellationToken cancellationToken = default)
-    {
-        var result = await _ticketQueryService.GetCommentsPagedAsync(ticketId, request.Page, request.PageSize, cancellationToken);
 
-        var items = result.Items.Select(c => new CommentResponse(
-            c.Id,
-            c.Content,
-            c.CreationDate,
-            new UserResponse(c.Author.Id, c.Author.Firstname, c.Author.Lastname)
-            )).ToList();
-        var response = new PagedResponse<CommentResponse>(items, request.Page, request.PageSize, result.TotalCount);
-        return Ok(response);
-    }
 }
