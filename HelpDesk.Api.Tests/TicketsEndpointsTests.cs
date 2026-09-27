@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using System.Data;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -178,17 +179,40 @@ public class TicketsEndpointsTests
     public async Task GetTicket_WithUnknownId_ShouldReturnNotFound(int id)
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         var getResponse = await client.GetAsync($"/api/tickets/{id}");
 
-        var problem = await getResponse.Content
-     .ReadFromJsonAsync<ProblemDetails>();
+        var problem = await getResponse.Content.ReadFromJsonAsync<ProblemDetails>();
 
         Assert.NotNull(problem);
         Assert.Equal(404, problem.Status);
         Assert.Equal("Resource not found", problem.Title);
         Assert.Contains(id.ToString(), problem.Detail);
+    }
+
+    [Fact]
+    public async Task GetTicket_WithoutToken_ShouldReturnUnauthorized()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Ticket ticket = new("Some title", "Some description", TicketPriority.Normal);
+
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.Unauthorized, getResponse.StatusCode);
     }
     #endregion
 
@@ -278,11 +302,12 @@ public class TicketsEndpointsTests
         var putResponse = await client.PutAsync($"/api/tickets/{ticketId}/assignee/{userId}", null);
         Assert.Equal(HttpStatusCode.Unauthorized, putResponse.StatusCode);
 
-        var ticketReponse = await client.GetAsync($"/api/tickets/{ticketId}");
-        Assert.Equal(HttpStatusCode.OK, ticketReponse.StatusCode);
-        var persistedTicket = await ticketReponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
-        Assert.NotNull(persistedTicket);
-        Assert.Null(persistedTicket.AssignedUser);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var persistedTicket = await context.Tickets.Include(t => t.AssignedUser).SingleAsync(t => t.Id == ticketId);
+            Assert.Null(persistedTicket.AssignedUser);
+        }
     }
 
     [Fact]
@@ -475,7 +500,6 @@ public class TicketsEndpointsTests
         var client = factory.CreateClient();
 
         int ticketId, assigneeId;
-
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -504,13 +528,13 @@ public class TicketsEndpointsTests
         var deleteResponse = await client.DeleteAsync($"/api/tickets/{ticketId}/assignee/{assigneeId}");
         Assert.Equal(HttpStatusCode.Unauthorized, deleteResponse.StatusCode);
 
-        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
-        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
-
-        var ticketFromDb = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
-        Assert.NotNull(ticketFromDb);
-        Assert.NotNull(ticketFromDb.AssignedUser);
-        Assert.Equal(assigneeId, ticketFromDb.AssignedUser.Id);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var persistedTicket = await context.Tickets.Include(t => t.AssignedUser).SingleAsync(t => t.Id == ticketId);
+            Assert.NotNull(persistedTicket.AssignedUser);
+            Assert.Equal(assigneeId, persistedTicket.AssignedUser.Id);
+        }
     }
 
     [Fact]
@@ -1491,11 +1515,18 @@ public class TicketsEndpointsTests
         await context.SaveChangesAsync();
     }
 
-    [Fact]
-    public async Task GetTickets_WithValidRequest_ShouldReturnOk()
+    [Theory]
+    [InlineData(UserRole.User)]
+    [InlineData(UserRole.Technician)]
+    [InlineData(UserRole.Administrator)]
+    public async Task GetTickets_WithAllowedRole_ShouldReturnOk(UserRole role)
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: role);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         HelpDeskDbContext? context = null;
         using (var scope = factory.Services.CreateScope())
         {
@@ -1557,10 +1588,31 @@ public class TicketsEndpointsTests
     }
 
     [Fact]
-    public async Task GetTickets_WithInvalidStatus_ShouldReturnBadRequest()
+    public async Task GetTickets_WithoutToken_ShouldReturnUnauthorized()
     {
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
+
+        HelpDeskDbContext? context = null;
+        using (var scope = factory.Services.CreateScope())
+        {
+            context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForGetTickets(context);
+        }
+
+        var responsePage1 = await client.GetAsync($"/api/tickets?status=Open&priority=High&page=1&pageSize=3");
+        Assert.Equal(HttpStatusCode.Unauthorized, responsePage1.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetTickets_WithInvalidStatus_ShouldReturnBadRequest()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         var response = await client.GetAsync($"/api/tickets?status=InvalidStatus");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -1569,7 +1621,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithInvalidPriority_ShouldReturnBadRequest()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         var response = await client.GetAsync($"/api/tickets?priority=InvalidPriority");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -1578,7 +1634,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithHasAssigneeFalseAndAssignedUserId_ShouldReturnBadRequest()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         var response = await client.GetAsync($"/api/tickets?hasAssignee=false&assignedUserId=1");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -1587,7 +1647,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithTitleSearch_ShouldReturnFilteredTickets()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         HelpDeskDbContext? context = null;
         using (var scope = factory.Services.CreateScope())
         {
@@ -1618,7 +1682,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithDescriptionSearch_ShouldReturnFilteredTickets()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         HelpDeskDbContext? context = null;
         using (var scope = factory.Services.CreateScope())
         {
@@ -1649,7 +1717,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithUserAssignedId_ShouldReturnFilteredTickets()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1688,7 +1760,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithUserAssignedIdNull_ShouldReturnAllTickets()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1705,7 +1781,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WhenHasAssigneeIsTrue_ShouldReturnFilteredTicketsWithAssignee()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1738,7 +1818,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WhenHasAssigneeIsFalse_ShouldReturnFilteredTicketsWithoutAssignee()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1768,10 +1852,14 @@ public class TicketsEndpointsTests
     }
 
     [Fact]
-    public async Task Get_Tickets_WithMultipleFilters_ShouldReturnFilteredTickets()
+    public async Task GetTickets_WithMultipleFilters_ShouldReturnFilteredTickets()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1810,7 +1898,11 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithOOBPaging_ShouldReturnEmptyItems()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1830,7 +1922,10 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithInvalidPageRelatedRequest_ShouldReturnBadRequest()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         var response1 = await client.GetAsync("/api/tickets?page=0");
         Assert.Equal(HttpStatusCode.BadRequest, response1.StatusCode);
@@ -1844,7 +1939,10 @@ public class TicketsEndpointsTests
     public async Task GetTickets_WithNoMatchSearch_ShouldReturnEmptyItems()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -1920,7 +2018,10 @@ public class TicketsEndpointsTests
     public async Task GetSortedTickets_WithSortByAscTitle_ShouldReturnTicketsSortedByAscTitle()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -1946,7 +2047,10 @@ public class TicketsEndpointsTests
     public async Task GetSortedTickets_WithSortByDescTitle_ShouldReturnTicketsSortedByDescTitle()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -1972,7 +2076,10 @@ public class TicketsEndpointsTests
     public async Task GetSortedTickets_WithSortByAscPriority_ShouldReturnTicketsSortedByAscPriority()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Technician);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -2005,7 +2112,10 @@ public class TicketsEndpointsTests
     public async Task GetSortedTickets_WithSortByDescStatus_ShouldReturnTicketsSortedByDescStatus()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -2039,7 +2149,10 @@ public class TicketsEndpointsTests
     public async Task GetSortedTickets_WithNoSortOption_ShouldReturnTicketsSortedByDescCreationDate()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -2076,7 +2189,11 @@ public class TicketsEndpointsTests
     public async Task GetSortedTickets_WithInvalidSortBy_ShouldReturnBadRequest()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         var response = await client.GetAsync("/api/tickets?sortBy=model");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -2085,9 +2202,29 @@ public class TicketsEndpointsTests
     public async Task GetSortedTickets_WithInvalidSortDirection_ShouldReturnBadRequest()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
         var response = await client.GetAsync("/api/tickets?sortDirection=linear");
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSortedTickets_WithoutToken_ShouldReturnUnauthorized()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await CreateNecessaryContextForTicketsSortingTests(context);
+        }
+
+        var response = await client.GetAsync("/api/tickets");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     #endregion
@@ -2153,7 +2290,10 @@ public class TicketsEndpointsTests
     public async Task GetComments_WithValidRequest_ShouldReturnOk()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -2194,7 +2334,10 @@ public class TicketsEndpointsTests
     public async Task GetComments_WithPagedDataRequest_ShouldReturnOkAndProperlyPagedItems()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -2232,7 +2375,10 @@ public class TicketsEndpointsTests
     public async Task GetComments_WhenTicketDoesNotExists_ShouldReturnNotFound()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         var response = await client.GetAsync($"/api/tickets/1/comments");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -2246,7 +2392,10 @@ public class TicketsEndpointsTests
     public async Task GetComments_WhenTicketDoesNotContainComments_ShouldReturnOkAndEmptyItems()
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         using (var scope = factory.Services.CreateScope())
         {
@@ -2272,11 +2421,31 @@ public class TicketsEndpointsTests
     string url)
     {
         using var factory = new HelpDeskApiFactory();
+        var userId = await SeedUserWithPasswordAsync(factory);
+
         var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
 
         var response = await client.GetAsync(url);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetComments_WithoutToken_ShouldReturnUnauthorized()
+    {
+        using var factory = new HelpDeskApiFactory();
+        var client = factory.CreateClient();
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            await context.Tickets.AddAsync(new Ticket("Some title", "Some description", TicketPriority.High));
+            await context.SaveChangesAsync();
+        }
+
+        var response = await client.GetAsync($"/api/tickets/1/comments");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
     #endregion
 }

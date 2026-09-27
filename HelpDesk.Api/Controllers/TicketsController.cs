@@ -9,6 +9,7 @@ using System.Security.Claims;
 namespace HelpDesk.Api.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/tickets")]
 public class TicketsController : ControllerBase
 {
@@ -38,7 +39,6 @@ public class TicketsController : ControllerBase
         return Ok(ticket.ToDetailsResponse());
     }
 
-    [Authorize]
     [HttpPost]
     public async Task<ActionResult<TicketDetailsResponse>> Create(CreateTicketRequest request, CancellationToken cancellationToken = default)
     {
@@ -80,7 +80,6 @@ public class TicketsController : ControllerBase
         return NoContent();
     }
 
-    [Authorize]
     [HttpPost("{ticketId:int}/comments")]
     public async Task<ActionResult<CommentResponse>> AddComment(int ticketId, CreateCommentRequest request, CancellationToken cancellationToken = default)
     {
