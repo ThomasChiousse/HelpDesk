@@ -181,7 +181,22 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var result = await _ticketQueryService.GetPagedAsync(mapping.Options!, cancellationToken);
+        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int currentUserId))
+        {
+            return Unauthorized();
+        }
+
+        if (!(Enum.TryParse<UserRole>(User.FindFirstValue(ClaimTypes.Role), out UserRole currentUserRole)
+            && Enum.IsDefined<UserRole>(currentUserRole)))
+        {
+            ModelState.AddModelError(
+                nameof(request.Priority),
+                "Unknown user role.");
+
+            return ValidationProblem(ModelState);
+        }
+
+        var result = await _ticketQueryService.GetPagedAsync(mapping.Options!, currentUserId, currentUserRole, cancellationToken);
         var items = result.Items.Select(t => new TicketListItemResponse(
           t.Id, t.Title, t.Priority.ToString(), t.Status.ToString(), t.CreationDate
            )).ToList();

@@ -26,8 +26,16 @@ namespace HelpDesk.Application.Services
                 : ticket;
         }
 
-        public async Task<PagedResult<TicketListItem>> GetPagedAsync(TicketQueryOptions options, CancellationToken cancellationToken = default)
+        public async Task<PagedResult<TicketListItem>> GetPagedAsync(TicketQueryOptions options, int currentUserId, UserRole currentUserRole, CancellationToken cancellationToken = default)
         {
+
+            if (currentUserRole == UserRole.User)
+            {
+                options = options with
+                {
+                    RequesterId = currentUserId
+                };
+            }
             return await _ticketRepository.GetPagedAsync(options, cancellationToken);
         }
 
