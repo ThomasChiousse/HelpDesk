@@ -14,9 +14,9 @@ namespace HelpDesk.Application.Services
             _userRepository = userRepository;
         }
 
-        public async Task<Ticket> CreateAsync(string title, string description, TicketPriority priority, int requesterId = 0, CancellationToken cancellationToken = default)
+        public async Task<Ticket> CreateAsync(string title, string description, TicketPriority priority, int requesterId, CancellationToken cancellationToken = default)
         {
-            var requester = await _userRepository.GetByIdAsync(requesterId, cancellationToken);
+            var requester = await _userRepository.GetByIdAsync(requesterId, cancellationToken) ?? throw new KeyNotFoundException($"User {requesterId} was not found");
             var ticket = new Ticket(title, description, priority, requester: requester);
 
             await _ticketRepository.AddAsync(ticket, cancellationToken);

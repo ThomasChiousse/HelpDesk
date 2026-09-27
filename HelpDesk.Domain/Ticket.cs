@@ -40,6 +40,7 @@ public class Ticket
         Status = TicketStatus.Open;
         CreationDate = DateTime.UtcNow;
         AssignedUser = assignedUser;
+        Requester = requester;
     }
 
     private Ticket()

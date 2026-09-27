@@ -17,7 +17,11 @@ namespace HelpDesk.Tests.ServicesTests
             const string description = "Several keys do not work";
             const TicketPriority priority = TicketPriority.High;
 
-            var ticket = await service.CreateAsync(title, description, priority);
+            User requester = new("Requester", "Lastname", "requester@example.com", UserRole.Technician);
+            await userRepository.AddAsync(requester);
+            await userRepository.SaveChangesAsync();
+
+            var ticket = await service.CreateAsync(title, description, priority, requester.Id);
             // Assert
             Assert.Equal(title, ticket.Title);
             Assert.Equal(description, ticket.Description);
@@ -26,6 +30,9 @@ namespace HelpDesk.Tests.ServicesTests
 
             Assert.True(ticketRepository.Contains(ticket));
             Assert.True(ticketRepository.SaveChangesCalled);
+
+            Assert.NotNull(ticket.Requester);
+            Assert.Equal(requester.Id, ticket.Requester.Id);
         }
 
         [Fact]
@@ -36,16 +43,32 @@ namespace HelpDesk.Tests.ServicesTests
             var userRepository = new FakeUserRepository();
             var service = new TicketCreationService(ticketRepository, userRepository);
 
+            User requester = new("Requester", "Lastname", "requester@example.com", UserRole.Technician);
+            await userRepository.AddAsync(requester);
+            await userRepository.SaveChangesAsync();
+
             var invalidPriority = (TicketPriority)999;
 
             // Act + Assert
             await Assert.ThrowsAsync<ArgumentException>(() =>
-                service.CreateAsync(
-                    "Test",
-                    "Description",
-                    invalidPriority));
+                service.CreateAsync("Test", "Description", invalidPriority, requester.Id));
 
             Assert.False(ticketRepository.SaveChangesCalled);
+            Assert.Equal(0, ticketRepository.Count());
+        }
+
+        [Fact]
+        public async Task CreateAsync_WithUnknownRequester_ShouldNotCreateTicket()
+        {
+            var ticketRepository = new FakeTicketRepository();
+            var userRepository = new FakeUserRepository();
+            var service = new TicketCreationService(ticketRepository, userRepository);
+
+            const string title = "Keyboard broken";
+            const string description = "Several keys do not work";
+            const TicketPriority priority = TicketPriority.High;
+            await Assert.ThrowsAsync<KeyNotFoundException>(() =>
+                service.CreateAsync(title, description, priority, 999));
             Assert.Equal(0, ticketRepository.Count());
         }
     }
