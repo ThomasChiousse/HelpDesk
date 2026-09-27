@@ -107,6 +107,7 @@ public class TicketsController : ControllerBase
         return Ok(new TicketStatusResponse(status.ToString()));
     }
 
+    [Authorize(Policy = "CanManageTickets")]
     [HttpPut("{ticketId:int}")]
     public async Task<ActionResult<TicketDetailsResponse>> Update(int ticketId, UpdateTicketRequest request, CancellationToken cancellationToken = default)
     {
@@ -123,6 +124,7 @@ public class TicketsController : ControllerBase
         return Ok(updatedTicket.ToDetailsResponse());
     }
 
+    [Authorize(Policy = "CanManageTickets")]
     [HttpPatch("{ticketId:int}")]
     public async Task<ActionResult<TicketDetailsResponse>> Patch(int ticketId, PatchTicketRequest request, CancellationToken cancellationToken = default)
     {
