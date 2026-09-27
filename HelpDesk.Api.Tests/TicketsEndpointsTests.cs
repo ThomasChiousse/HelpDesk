@@ -1015,7 +1015,7 @@ public class TicketsEndpointsTests
             Priority = "High"
         };
 
-        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{999}", updateRequest);
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest);
         Assert.Equal(HttpStatusCode.Unauthorized, updateResponse.StatusCode);
 
         using (var scope = factory.Services.CreateScope())
