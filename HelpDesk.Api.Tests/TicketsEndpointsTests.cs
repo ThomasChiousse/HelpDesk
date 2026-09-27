@@ -945,6 +945,13 @@ public class TicketsEndpointsTests
 
         var postResponse = await client.PostAsJsonAsync($"/api/tickets/{ticketId}/comments", commentRequest);
         Assert.Equal(HttpStatusCode.Forbidden, postResponse.StatusCode);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Assert.Empty(context.Comments);
+        }
+
     }
     #endregion
 
