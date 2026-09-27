@@ -2437,14 +2437,17 @@ public class TicketsEndpointsTests
         using var factory = new HelpDeskApiFactory();
         var client = factory.CreateClient();
 
+        int ticketId;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            await context.Tickets.AddAsync(new Ticket("Some title", "Some description", TicketPriority.High));
+            var ticket = new Ticket("Some title", "Some description", TicketPriority.High);
+            await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
+            ticketId = ticket.Id;
         }
 
-        var response = await client.GetAsync($"/api/tickets/1/comments");
+        var response = await client.GetAsync($"/api/tickets/{ticketId}/comments");
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
     #endregion
