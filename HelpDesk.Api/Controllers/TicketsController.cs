@@ -189,11 +189,7 @@ public class TicketsController : ControllerBase
         if (!(Enum.TryParse<UserRole>(User.FindFirstValue(ClaimTypes.Role), out UserRole currentUserRole)
             && Enum.IsDefined<UserRole>(currentUserRole)))
         {
-            ModelState.AddModelError(
-                nameof(request.Priority),
-                "Unknown user role.");
-
-            return ValidationProblem(ModelState);
+            return Forbid();
         }
 
         var result = await _ticketQueryService.GetPagedAsync(mapping.Options!, currentUserId, currentUserRole, cancellationToken);

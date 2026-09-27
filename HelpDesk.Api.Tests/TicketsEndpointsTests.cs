@@ -1516,7 +1516,6 @@ public class TicketsEndpointsTests
     }
 
     [Theory]
-    [InlineData(UserRole.User)]
     [InlineData(UserRole.Technician)]
     [InlineData(UserRole.Administrator)]
     public async Task GetTickets_WithAllowedRole_ShouldReturnOk(UserRole role)
@@ -1585,6 +1584,49 @@ public class TicketsEndpointsTests
                     filteredTicketsList[i].Status);
             }
         }
+    }
+
+    [Fact]
+    public async Task GetTickets_AsUser_ShouldReturnOnlyOwnTickets()
+    {
+        using var factory = new HelpDeskApiFactory();
+        int loggedUserId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
+
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, loggedUserId);
+
+        int johnsTicketId1, johnsTicketId2;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            User john = await context.Users.SingleAsync(u => u.Id == loggedUserId);
+            Ticket johnsFirstTicket = new("John's 1st ticket", "John's 1st description", TicketPriority.Normal, requester: john);
+            Ticket johnsSecondTicket = new("John's 2nd ticket", "John's 2nd description", TicketPriority.Normal, requester: john);
+
+            User jane = new("Jane", "Smith", "jane.smith@example.com", UserRole.Technician);
+            Ticket janeTicket = new("Jane's only ticket", "Jane's only description", TicketPriority.Low, requester: jane);
+
+            Ticket oldTicket = new("Old Ticket", "With no requester", TicketPriority.Low);
+
+            await context.Tickets.AddRangeAsync([johnsFirstTicket, johnsSecondTicket, janeTicket, oldTicket]);
+            await context.Users.AddRangeAsync([jane]);
+            await context.SaveChangesAsync();
+
+            johnsTicketId1 = johnsFirstTicket.Id;
+            johnsTicketId2 = johnsSecondTicket.Id;
+        }
+
+        var getResponse = await client.GetAsync("/api/tickets");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+
+        var responsePage = await getResponse.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
+        Assert.NotNull(responsePage);
+        Assert.Equal(2, responsePage.TotalCount);
+        Assert.Equal(2, responsePage.Items.Count);
+
+        var ticketsList = responsePage.Items.ToList();
+        Assert.Equal(johnsTicketId2, ticketsList[0].Id);
+        Assert.Equal(johnsTicketId1, ticketsList[1].Id);
     }
 
     [Fact]
