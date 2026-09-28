@@ -5,7 +5,6 @@ using HelpDesk.Application.Services;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace HelpDesk.Api.Controllers;
 
@@ -65,11 +64,6 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        //if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int requesterId))
-        //{
-        //    return Unauthorized();
-        //}
-
         var ticket = await _ticketCreationService.CreateAsync(request.Title, request.Description, priority, _currentUser.Id, cancellationToken);
 
         var response = new TicketDetailsResponse(
@@ -103,12 +97,6 @@ public class TicketsController : ControllerBase
     [HttpPost("{ticketId:int}/comments")]
     public async Task<ActionResult<CommentResponse>> AddComment(int ticketId, CreateCommentRequest request, CancellationToken cancellationToken = default)
     {
-        //var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        //if (!int.TryParse(userIdClaim, out var userId))
-        //{
-        //    return Unauthorized();
-        //}
-
         var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
 
         var authorizationResult = await _authorizationService.AuthorizeAsync(User, ticket, "CanViewTicket");
@@ -227,18 +215,8 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int currentUserId))
-        {
-            return Unauthorized();
-        }
 
-        if (!(Enum.TryParse<UserRole>(User.FindFirstValue(ClaimTypes.Role), out UserRole currentUserRole)
-            && Enum.IsDefined<UserRole>(currentUserRole)))
-        {
-            return Forbid();
-        }
-
-        var result = await _ticketQueryService.GetPagedAsync(mapping.Options!, currentUserId, currentUserRole, cancellationToken);
+        var result = await _ticketQueryService.GetPagedAsync(mapping.Options!, _currentUser.Id, _currentUser.Role, cancellationToken);
         var items = result.Items.Select(t => new TicketListItemResponse(
           t.Id, t.Title, t.Priority.ToString(), t.Status.ToString(), t.CreationDate
            )).ToList();
