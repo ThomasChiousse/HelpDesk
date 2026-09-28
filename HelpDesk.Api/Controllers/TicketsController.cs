@@ -1,6 +1,5 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Api.Mappings;
-using HelpDesk.Application.Authentication;
 using HelpDesk.Application.Services;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Authorization;
@@ -21,10 +20,9 @@ public class TicketsController : ControllerBase
     private readonly TicketUpdateService _ticketUpdateService;
     private readonly TicketPatchService _ticketPatchService;
     private readonly IAuthorizationService _authorizationService;
-    private readonly ICurrentUser _currentUser;
     public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService,
         TicketCommentService ticketCommentService, TicketStatusService ticketStatusService, TicketUpdateService ticketUpdateService, TicketPatchService ticketPatchService,
-        IAuthorizationService authorizationService, ICurrentUser currentUser)
+        IAuthorizationService authorizationService)
     {
         _ticketQueryService = ticketQueryService;
         _ticketCreationService = ticketCreationService;
@@ -34,7 +32,6 @@ public class TicketsController : ControllerBase
         _ticketUpdateService = ticketUpdateService;
         _ticketPatchService = ticketPatchService;
         _authorizationService = authorizationService;
-        _currentUser = currentUser;
     }
 
     [HttpGet("{id:int}")]
