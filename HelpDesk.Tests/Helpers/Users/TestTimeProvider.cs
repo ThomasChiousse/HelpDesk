@@ -1,4 +1,4 @@
-﻿namespace HelpDesk.Tests
+﻿namespace HelpDesk.Tests.Helpers.Users
 {
     public class TestTimeProvider : TimeProvider
     {

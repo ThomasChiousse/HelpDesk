@@ -21,4 +21,5 @@ public sealed record TicketQueryOptions
 
     public SortDirection SortDirection { get; init; }
         = SortDirection.Descending;
+    public int? RequesterId { get; init; }
 }

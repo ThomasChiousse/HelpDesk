@@ -4,6 +4,7 @@ using HelpDesk.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace HelpDesk.Infrastructure.Migrations
 {
     [DbContext(typeof(HelpDeskDbContext))]
-    partial class HelpDeskDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260923205857_AddUserAuthentication")]
+    partial class AddUserAuthentication
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -75,9 +78,6 @@ namespace HelpDesk.Infrastructure.Migrations
                     b.Property<int>("Priority")
                         .HasColumnType("int");
 
-                    b.Property<int?>("RequesterId")
-                        .HasColumnType("int");
-
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -89,8 +89,6 @@ namespace HelpDesk.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("AssignedUserId");
-
-                    b.HasIndex("RequesterId");
 
                     b.ToTable("Tickets");
                 });
@@ -157,13 +155,7 @@ namespace HelpDesk.Infrastructure.Migrations
                         .HasForeignKey("AssignedUserId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("HelpDesk.Domain.User", "Requester")
-                        .WithMany()
-                        .HasForeignKey("RequesterId");
-
                     b.Navigation("AssignedUser");
-
-                    b.Navigation("Requester");
                 });
 
             modelBuilder.Entity("HelpDesk.Domain.Ticket", b =>

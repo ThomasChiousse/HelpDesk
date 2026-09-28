@@ -17,8 +17,6 @@ public class TicketRepository : ITicketRepository
         _context = context;
     }
 
-
-
     public async Task AddAsync(Ticket ticket, CancellationToken cancellationToken = default)
     {
         await _context.Tickets.AddAsync(ticket, cancellationToken);
@@ -44,6 +42,7 @@ public class TicketRepository : ITicketRepository
         return await _context.Tickets
             .AsNoTracking()
             .Include(t => t.AssignedUser)
+            .Include(t => t.Requester)
             .FirstOrDefaultAsync(t => t.Id == id, cancellationToken);
     }
 
@@ -62,6 +61,13 @@ public class TicketRepository : ITicketRepository
         if (options.Priority.HasValue)
         {
             query = query.Where(t => t.Priority == options.Priority.Value);
+        }
+
+        if (options.RequesterId.HasValue)
+        {
+            query = query.Where(
+                t => t.Requester != null
+                     && t.Requester.Id == options.RequesterId.Value);
         }
 
         if (options.HasAssignee.HasValue)

@@ -3,7 +3,7 @@ using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Tickets.Queries;
 using HelpDesk.Domain;
 
-namespace HelpDesk.Tests
+namespace HelpDesk.Tests.TestRepositories
 {
     internal class FakeTicketRepository : ITicketRepository
     {

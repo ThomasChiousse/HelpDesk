@@ -1,7 +1,7 @@
 ﻿using HelpDesk.Application.Repositories;
 using HelpDesk.Domain;
 
-namespace HelpDesk.Tests
+namespace HelpDesk.Tests.TestRepositories
 {
     internal class FakeUserRepository : IUserRepository
     {
@@ -12,7 +12,8 @@ namespace HelpDesk.Tests
 
         public Task AddAsync(User user, CancellationToken cancellationToken = default)
         {
-            throw new NotImplementedException();
+            _users.Add(user);
+            return Task.CompletedTask;
         }
 
         public Task<User?> GetByIdAsync(int id, CancellationToken cancellationToken = default)
@@ -25,6 +26,12 @@ namespace HelpDesk.Tests
         {
             SaveChangesCalled = true;
             return Task.CompletedTask;
+        }
+
+        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken)
+        {
+            var result = _users.FirstOrDefault(u => u.Email == email);
+            return Task.FromResult(result);
         }
     }
 }

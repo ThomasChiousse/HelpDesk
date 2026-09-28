@@ -1,17 +1,23 @@
+using HelpDesk.Api.Authorization;
 using HelpDesk.Api.ExceptionHandling;
+using HelpDesk.Application.Authentication;
 using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Services;
+using HelpDesk.Infrastructure.Authentication;
 using HelpDesk.Infrastructure.Persistence;
 using HelpDesk.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-
 
 if (!builder.Environment.IsEnvironment("Testing"))
 {
@@ -25,6 +31,8 @@ if (!builder.Environment.IsEnvironment("Testing"))
 builder.Services.AddOpenApi();
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IPasswordHasher, AspNetPasswordHasher>();
+builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
 builder.Services.AddScoped<TicketAssignmentService>();
 builder.Services.AddScoped<TicketQueryService>();
@@ -34,12 +42,60 @@ builder.Services.AddScoped<TicketStatusService>();
 builder.Services.AddScoped<TicketUpdateService>();
 builder.Services.AddScoped<TicketPatchService>();
 
+builder.Services.AddScoped<AuthenticationService>();
+
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException(
+        "JWT signing key is not configured.");
+
+var jwtIssuer = builder.Configuration["Jwt:Issuer"]
+    ?? throw new InvalidOperationException(
+        "JWT issuer is not configured.");
+
+var jwtAudience = builder.Configuration["Jwt:Audience"]
+    ?? throw new InvalidOperationException(
+        "JWT audience is not configured.");
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = jwtIssuer,
+
+            ValidateAudience = true,
+            ValidAudience = jwtAudience,
+
+            ValidateLifetime = true,
+
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("CanManageTickets", policy =>
+        policy.RequireRole(["Technician", "Administrator"]))
+    .AddPolicy("CanViewTicket", policy =>
+        policy.AddRequirements(new CanViewTicketRequirement()));
+
+builder.Services.AddSingleton<IAuthorizationHandler, CanViewTicketHandler>();
 
 var app = builder.Build();
 
 app.UseExceptionHandler();
+
+app.UseAuthentication();
+app.UseAuthorization();
 
 if (app.Environment.IsDevelopment())
 {
