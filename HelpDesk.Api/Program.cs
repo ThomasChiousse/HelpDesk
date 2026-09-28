@@ -44,6 +44,9 @@ builder.Services.AddScoped<TicketPatchService>();
 
 builder.Services.AddScoped<AuthenticationService>();
 
+builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
+builder.Services.AddHttpContextAccessor();
+
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 

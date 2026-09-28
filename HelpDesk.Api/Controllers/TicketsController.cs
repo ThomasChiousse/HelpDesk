@@ -1,4 +1,5 @@
-﻿using HelpDesk.Api.Contracts.Tickets;
+﻿using HelpDesk.Api.Authorization;
+using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Api.Mappings;
 using HelpDesk.Application.Services;
 using HelpDesk.Domain;
@@ -21,9 +22,10 @@ public class TicketsController : ControllerBase
     private readonly TicketUpdateService _ticketUpdateService;
     private readonly TicketPatchService _ticketPatchService;
     private readonly IAuthorizationService _authorizationService;
+    private readonly ICurrentUser _currentUser;
     public TicketsController(TicketQueryService ticketQueryService, TicketCreationService ticketCreationService, TicketAssignmentService ticketAssignmentService,
         TicketCommentService ticketCommentService, TicketStatusService ticketStatusService, TicketUpdateService ticketUpdateService, TicketPatchService ticketPatchService,
-        IAuthorizationService authorizationService)
+        IAuthorizationService authorizationService, ICurrentUser currentUser)
     {
         _ticketQueryService = ticketQueryService;
         _ticketCreationService = ticketCreationService;
@@ -33,6 +35,7 @@ public class TicketsController : ControllerBase
         _ticketUpdateService = ticketUpdateService;
         _ticketPatchService = ticketPatchService;
         _authorizationService = authorizationService;
+        _currentUser = currentUser;
     }
 
     [HttpGet("{id:int}")]
@@ -62,12 +65,12 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int requesterId))
-        {
-            return Unauthorized();
-        }
+        //if (!int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out int requesterId))
+        //{
+        //    return Unauthorized();
+        //}
 
-        var ticket = await _ticketCreationService.CreateAsync(request.Title, request.Description, priority, requesterId, cancellationToken);
+        var ticket = await _ticketCreationService.CreateAsync(request.Title, request.Description, priority, _currentUser.Id, cancellationToken);
 
         var response = new TicketDetailsResponse(
             ticket.Id,
@@ -100,12 +103,11 @@ public class TicketsController : ControllerBase
     [HttpPost("{ticketId:int}/comments")]
     public async Task<ActionResult<CommentResponse>> AddComment(int ticketId, CreateCommentRequest request, CancellationToken cancellationToken = default)
     {
-        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-        if (!int.TryParse(userIdClaim, out var userId))
-        {
-            return Unauthorized();
-        }
+        //var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        //if (!int.TryParse(userIdClaim, out var userId))
+        //{
+        //    return Unauthorized();
+        //}
 
         var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
 
@@ -115,7 +117,7 @@ public class TicketsController : ControllerBase
             return Forbid();
         }
 
-        var comment = await _ticketCommentService.AddCommentAsync(ticketId, userId, request.Content, cancellationToken);
+        var comment = await _ticketCommentService.AddCommentAsync(ticketId, _currentUser.Id, request.Content, cancellationToken);
         var response = new CommentResponse(
             comment.Id,
             comment.Content,
