@@ -1,6 +1,6 @@
 ﻿using HelpDesk.Domain;
 
-namespace HelpDesk.Api.Authorization;
+namespace HelpDesk.Application.Authentication;
 
 public interface ICurrentUser
 {

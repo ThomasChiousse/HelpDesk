@@ -1,6 +1,6 @@
-﻿using HelpDesk.Api.Authorization;
-using HelpDesk.Api.Contracts.Tickets;
+﻿using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Api.Mappings;
+using HelpDesk.Application.Authentication;
 using HelpDesk.Application.Services;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Authorization;
@@ -64,7 +64,7 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        var ticket = await _ticketCreationService.CreateAsync(request.Title, request.Description, priority, _currentUser.Id, cancellationToken);
+        var ticket = await _ticketCreationService.CreateAsync(request.Title, request.Description, priority, cancellationToken);
 
         var response = new TicketDetailsResponse(
             ticket.Id,
@@ -105,7 +105,7 @@ public class TicketsController : ControllerBase
             return Forbid();
         }
 
-        var comment = await _ticketCommentService.AddCommentAsync(ticketId, _currentUser.Id, request.Content, cancellationToken);
+        var comment = await _ticketCommentService.AddCommentAsync(ticketId, request.Content, cancellationToken);
         var response = new CommentResponse(
             comment.Id,
             comment.Content,
@@ -216,7 +216,7 @@ public class TicketsController : ControllerBase
         }
 
 
-        var result = await _ticketQueryService.GetPagedAsync(mapping.Options!, _currentUser.Id, _currentUser.Role, cancellationToken);
+        var result = await _ticketQueryService.GetPagedAsync(mapping.Options!, cancellationToken);
         var items = result.Items.Select(t => new TicketListItemResponse(
           t.Id, t.Title, t.Priority.ToString(), t.Status.ToString(), t.CreationDate
            )).ToList();

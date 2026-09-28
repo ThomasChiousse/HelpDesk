@@ -1,4 +1,5 @@
-﻿using HelpDesk.Domain;
+﻿using HelpDesk.Application.Authentication;
+using HelpDesk.Domain;
 using System.Security.Claims;
 
 namespace HelpDesk.Api.Authorization
