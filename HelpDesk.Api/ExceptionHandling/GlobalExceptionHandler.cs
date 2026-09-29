@@ -39,6 +39,9 @@ public class GlobalExceptionHandler : IExceptionHandler
             TicketAlreadyClosedException =>
                 StatusCodes.Status409Conflict,
 
+            UserRegistrationFailureException =>
+                StatusCodes.Status409Conflict,
+
             _ =>
                 StatusCodes.Status500InternalServerError
         };

@@ -3,6 +3,7 @@ using HelpDesk.Api.ExceptionHandling;
 using HelpDesk.Application.Authentication;
 using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Services;
+using HelpDesk.Application.Services.Tickets;
 using HelpDesk.Infrastructure.Authentication;
 using HelpDesk.Infrastructure.Persistence;
 using HelpDesk.Infrastructure.Repositories;

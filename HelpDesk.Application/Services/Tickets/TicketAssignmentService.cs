@@ -1,15 +1,13 @@
 ﻿using HelpDesk.Application.Repositories;
 
-namespace HelpDesk.Application.Services
+namespace HelpDesk.Application.Services.Tickets
 {
     public class TicketAssignmentService
     {
         private readonly IUserRepository _userRepository;
         private readonly ITicketRepository _ticketRepository;
 
-        public TicketAssignmentService(
-        ITicketRepository ticketRepository,
-        IUserRepository userRepository)
+        public TicketAssignmentService(ITicketRepository ticketRepository, IUserRepository userRepository)
         {
             _ticketRepository = ticketRepository;
             _userRepository = userRepository;

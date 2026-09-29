@@ -1,7 +1,7 @@
 ﻿using HelpDesk.Application.Repositories;
 using HelpDesk.Domain;
 
-namespace HelpDesk.Application.Services;
+namespace HelpDesk.Application.Services.Tickets;
 
 public class TicketUpdateService
 {
