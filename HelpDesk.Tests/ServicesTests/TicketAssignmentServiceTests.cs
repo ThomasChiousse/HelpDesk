@@ -1,4 +1,4 @@
-﻿using HelpDesk.Application.Services;
+﻿using HelpDesk.Application.Services.Tickets;
 using HelpDesk.Domain;
 using HelpDesk.Tests.TestRepositories;
 

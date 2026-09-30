@@ -1,7 +1,7 @@
 ﻿using HelpDesk.Application.Authentication;
+using HelpDesk.Application.Exceptions;
 using HelpDesk.Application.Repositories;
 using HelpDesk.Domain;
-using HelpDesk.Domain.Exceptions;
 
 namespace HelpDesk.Application.Services.Users;
 
@@ -15,12 +15,12 @@ public class UserRegistrationService
         _passwordHasher = passwordHasher;
     }
 
-    public async Task RegisterAsync(string firstname, string lastname, string email, string password, CancellationToken cancellationToken = default)
+    public async Task<User> RegisterAsync(string firstname, string lastname, string email, string password, CancellationToken cancellationToken = default)
     {
 
         if (await _userRepository.GetByEmailAsync(email, cancellationToken) != null)
         {
-            throw new UserRegistrationFailureException();
+            throw new UserEmailAlreadyInUseException();
         }
 
         var user = new User(firstname, lastname, email, UserRole.User);
@@ -29,5 +29,7 @@ public class UserRegistrationService
 
         await _userRepository.AddAsync(user, cancellationToken);
         await _userRepository.SaveChangesAsync(cancellationToken);
+
+        return user;
     }
 }

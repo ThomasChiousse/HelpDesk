@@ -1,5 +1,6 @@
-﻿using HelpDesk.Application.Services;
+﻿using HelpDesk.Application.Services.Tickets;
 using HelpDesk.Domain;
+using HelpDesk.Tests.Helpers.Authentication;
 using HelpDesk.Tests.TestRepositories;
 
 namespace HelpDesk.Tests.ServicesTests
