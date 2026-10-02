@@ -46,7 +46,7 @@ public class UserRegistrationServiceTests
 
         await fakeUserRepository.AddAsync(new User(firstname, lastname, sameEmail, UserRole.User));
 
-        await Assert.ThrowsAsync<UserEmailAlreadyInUseException>(async () => await userRegistrationService.RegisterAsync("John2", "SomeLastname", sameEmail, "some-password"));
+        await Assert.ThrowsAsync<UserEmailAlreadyInUseException>(() => userRegistrationService.RegisterAsync("John2", "SomeLastname", sameEmail, "some-password"));
         Assert.False(fakeUserRepository.SaveChangesCalled);
         Assert.Null(fakePasswordHasher.LastHashedUser);
         Assert.Null(fakePasswordHasher.LastProvidedPassword);

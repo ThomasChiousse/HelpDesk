@@ -1,5 +1,8 @@
 ﻿namespace HelpDesk.Api.Contracts.Users;
 
-public class UserResponse
-{
-}
+public sealed record UserResponse(
+    int Id,
+    string Firstname,
+    string Lastname,
+    string Email,
+    string Role);
