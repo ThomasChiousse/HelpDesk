@@ -63,7 +63,7 @@ public class UsersEndpointsTests
         };
 
 
-        await client.PostAsJsonAsync("/api/users/register", request);
+        await client.PostAsJsonAsync("/api/users", request);
 
         var response = await client.PostAsJsonAsync("/api/users", request);
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
@@ -72,6 +72,13 @@ public class UsersEndpointsTests
         Assert.Equal(409, problem.Status);
         Assert.Equal("Conflict", problem.Title);
         Assert.Contains("this email already exists", problem.Detail, StringComparison.OrdinalIgnoreCase);
+
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            Assert.Single(context.Users.Where(u => u.Email == request.Email));
+            Assert.Equal(1, context.Users.Count());
+        }
     }
 
     [Theory]
