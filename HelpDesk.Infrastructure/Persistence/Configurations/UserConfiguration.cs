@@ -24,7 +24,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.HasIndex(user => user.Email)
             .IsUnique()
-            .HasDatabaseName("UX_User_Email");
+            .HasDatabaseName("UX_Users_Email");
 
         builder.Property(user => user.Role);
 
