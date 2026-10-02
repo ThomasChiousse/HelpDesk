@@ -15,7 +15,7 @@ public class UsersController : ControllerBase
         _userRegistrationService = userRegistrationService;
     }
 
-    [HttpPost("register")]
+    [HttpPost]
     public async Task<ActionResult<UserResponse>> Register(
         RegisterUserRequest request,
         CancellationToken cancellationToken)

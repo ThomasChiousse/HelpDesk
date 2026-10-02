@@ -24,7 +24,7 @@ public class UsersEndpointsTests
             Password = "Ultr@SecureP@ssw0rd"
         };
 
-        var response = await client.PostAsJsonAsync("/api/users/register", request);
+        var response = await client.PostAsJsonAsync("/api/users", request);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
         var userResponse = await response.Content.ReadFromJsonAsync<UserResponse>();
@@ -32,6 +32,7 @@ public class UsersEndpointsTests
         Assert.Equal(request.Firstname, userResponse.Firstname);
         Assert.Equal(request.Lastname, userResponse.Lastname);
         Assert.Equal(request.Email, userResponse.Email);
+        Assert.Equal(UserRole.User.ToString(), userResponse.Role);
         Assert.True(userResponse.Id > 0);
 
         using (var scope = factory.Services.CreateScope())
@@ -43,6 +44,7 @@ public class UsersEndpointsTests
             Assert.Equal(request.Lastname, userInDb.Lastname);
             Assert.Equal(request.Email, userInDb.Email);
             Assert.Equal(UserRole.User, userInDb.Role);
+            Assert.NotNull(userInDb.PasswordHash);
             Assert.NotEqual(request.Password, userInDb.PasswordHash);
         }
     }
@@ -63,7 +65,8 @@ public class UsersEndpointsTests
 
         await client.PostAsJsonAsync("/api/users/register", request);
 
-        var response = await client.PostAsJsonAsync("/api/users/register", request);
+        var response = await client.PostAsJsonAsync("/api/users", request);
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(problem);
         Assert.Equal(409, problem.Status);
@@ -90,7 +93,7 @@ public class UsersEndpointsTests
             Password = password
         };
 
-        var response = await client.PostAsJsonAsync("/api/users/register", request);
+        var response = await client.PostAsJsonAsync("/api/users", request);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }
