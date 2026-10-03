@@ -17,6 +17,7 @@ namespace HelpDesk.Infrastructure.Persistence.Configurations
             builder.HasOne(ticket => ticket.AssignedUser).WithMany().HasForeignKey("AssignedUserId").IsRequired(false).OnDelete(DeleteBehavior.SetNull);
             builder.HasOne(ticket => ticket.Requester).WithMany().HasForeignKey("RequesterId").IsRequired(false).OnDelete(DeleteBehavior.ClientSetNull);
             builder.HasMany(ticket => ticket.Comments).WithOne().HasForeignKey("TicketId").IsRequired().OnDelete(DeleteBehavior.Cascade);
+            builder.Property(ticket => ticket.Version).IsRowVersion();
         }
     }
 }
