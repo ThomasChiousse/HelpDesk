@@ -1,6 +1,7 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Api.Mappings;
 using HelpDesk.Application.Services;
+using HelpDesk.Application.Services.Tickets;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

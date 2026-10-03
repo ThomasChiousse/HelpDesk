@@ -1,4 +1,5 @@
-﻿using HelpDesk.Domain.Exceptions;
+﻿using HelpDesk.Application.Exceptions;
+using HelpDesk.Domain.Exceptions;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 
@@ -37,6 +38,9 @@ public class GlobalExceptionHandler : IExceptionHandler
                 StatusCodes.Status409Conflict,
 
             TicketAlreadyClosedException =>
+                StatusCodes.Status409Conflict,
+
+            UserEmailAlreadyInUseException =>
                 StatusCodes.Status409Conflict,
 
             _ =>

@@ -23,7 +23,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .HasMaxLength(255);
 
         builder.HasIndex(user => user.Email)
-            .IsUnique();
+            .IsUnique()
+            .HasDatabaseName("UX_Users_Email");
 
         builder.Property(user => user.Role);
 

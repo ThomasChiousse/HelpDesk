@@ -28,7 +28,7 @@ namespace HelpDesk.Tests.TestRepositories
             return Task.CompletedTask;
         }
 
-        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken)
+        public Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
         {
             var result = _users.FirstOrDefault(u => u.Email == email);
             return Task.FromResult(result);

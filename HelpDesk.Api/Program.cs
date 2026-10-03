@@ -2,7 +2,8 @@ using HelpDesk.Api.Authorization;
 using HelpDesk.Api.ExceptionHandling;
 using HelpDesk.Application.Authentication;
 using HelpDesk.Application.Repositories;
-using HelpDesk.Application.Services;
+using HelpDesk.Application.Services.Tickets;
+using HelpDesk.Application.Services.Users;
 using HelpDesk.Infrastructure.Authentication;
 using HelpDesk.Infrastructure.Persistence;
 using HelpDesk.Infrastructure.Repositories;
@@ -29,20 +30,23 @@ if (!builder.Environment.IsEnvironment("Testing"))
 }
 
 builder.Services.AddOpenApi();
-builder.Services.AddScoped<ITicketRepository, TicketRepository>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<IPasswordHasher, AspNetPasswordHasher>();
-builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
-builder.Services.AddScoped<TicketAssignmentService>();
-builder.Services.AddScoped<TicketQueryService>();
-builder.Services.AddScoped<TicketCreationService>();
-builder.Services.AddScoped<TicketCommentService>();
-builder.Services.AddScoped<TicketStatusService>();
-builder.Services.AddScoped<TicketUpdateService>();
-builder.Services.AddScoped<TicketPatchService>();
+builder.Services
+    .AddScoped<ITicketRepository, TicketRepository>()
+    .AddScoped<IUserRepository, UserRepository>()
+    .AddScoped<IPasswordHasher, AspNetPasswordHasher>()
+    .AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
-builder.Services.AddScoped<AuthenticationService>();
+builder.Services
+    .AddScoped<TicketAssignmentService>()
+    .AddScoped<TicketQueryService>()
+    .AddScoped<TicketCreationService>()
+    .AddScoped<TicketCommentService>()
+    .AddScoped<TicketStatusService>()
+    .AddScoped<TicketUpdateService>()
+    .AddScoped<TicketPatchService>()
+    .AddScoped<AuthenticationService>()
+    .AddScoped<UserRegistrationService>();
 
 builder.Services.AddScoped<ICurrentUser, HttpCurrentUser>();
 builder.Services.AddHttpContextAccessor();
