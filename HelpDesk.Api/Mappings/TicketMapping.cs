@@ -19,6 +19,7 @@ public static class TicketMappings
                 : new UserResponse(
                     ticket.AssignedUser.Id,
                     ticket.AssignedUser.Firstname,
-                    ticket.AssignedUser.Lastname));
+                    ticket.AssignedUser.Lastname),
+            ticket.Version);
     }
 }

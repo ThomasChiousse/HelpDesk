@@ -149,4 +149,9 @@ public class TicketRepository : ITicketRepository
 
         return new PagedResult<CommentListItem>(items, totalCount);
     }
+
+    public void SetExpectedVersion(Ticket ticket, byte[] expectedVersion)
+    {
+        _context.Entry(ticket).Property(t => t.Version).OriginalValue = expectedVersion;
+    }
 }

@@ -20,7 +20,8 @@ namespace HelpDesk.Api.Contracts.Tickets
         string Priority,
         string Status,
         DateTime CreationDate,
-        UserResponse? AssignedUser);
+        UserResponse? AssignedUser,
+        byte[] Version);
 
     public record TicketListItemResponse(
     int Id,
@@ -69,6 +70,11 @@ namespace HelpDesk.Api.Contracts.Tickets
 
         [Required]
         public string Priority { get; init; } = string.Empty;
+
+        [Required]
+        [MinLength(8)]
+        [MaxLength(8)]
+        public byte[] Version { get; init; } = [];
     }
 
     public class PatchTicketRequest
@@ -80,6 +86,11 @@ namespace HelpDesk.Api.Contracts.Tickets
         public string? Description { get; init; }
 
         public string? Priority { get; init; }
+
+        [Required]
+        [MinLength(8)]
+        [MaxLength(8)]
+        public byte[] Version { get; init; } = [];
     }
 
     public class GetTicketsRequest
