@@ -2,22 +2,21 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace HelpDesk.Api.Tests;
 
 public class HelpDeskApiFactory : WebApplicationFactory<Program>
 {
-    private readonly SqliteConnection _connection =
-        new("DataSource=:memory:");
+    private readonly string _connectionString;
 
-    public HelpDeskApiFactory()
+    public HelpDeskApiFactory(string connectionString)
     {
-        _connection.Open();
+        _connectionString = connectionString;
     }
 
     protected override void ConfigureWebHost(
@@ -27,9 +26,13 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            services.RemoveAll<DbContextOptions<HelpDeskDbContext>>();
+
+            services.RemoveAll<HelpDeskDbContext>();
+
             services.AddDbContext<HelpDeskDbContext>(
                 options =>
-                    options.UseSqlite(_connection));
+                    options.UseSqlServer(_connectionString));
         });
     }
 
@@ -59,16 +62,8 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>
         var context = scope.ServiceProvider
             .GetRequiredService<HelpDeskDbContext>();
 
-        context.Database.EnsureCreated();
+        context.Database.Migrate();
 
         return host;
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-
-        if (disposing)
-            _connection.Dispose();
     }
 }

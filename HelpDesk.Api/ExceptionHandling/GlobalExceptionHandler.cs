@@ -43,6 +43,9 @@ public class GlobalExceptionHandler : IExceptionHandler
             UserEmailAlreadyInUseException =>
                 StatusCodes.Status409Conflict,
 
+            TicketConcurrencyException =>
+                StatusCodes.Status409Conflict,
+
             _ =>
                 StatusCodes.Status500InternalServerError
         };

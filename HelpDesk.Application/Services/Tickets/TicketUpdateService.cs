@@ -12,12 +12,14 @@ public class TicketUpdateService
         _ticketRepository = ticketRepository;
     }
 
-    public async Task<Ticket> UpdateAsync(int ticketId, string title, string description, TicketPriority priority, CancellationToken cancellationToken = default)
+    public async Task<Ticket> UpdateAsync(int ticketId, string title, string description, TicketPriority priority, byte[] version, CancellationToken cancellationToken = default)
     {
         var ticket = await _ticketRepository.GetByIdAsync(ticketId, cancellationToken) ?? throw new KeyNotFoundException($"Ticket with ID {ticketId} not found.");
+        _ticketRepository.SetExpectedVersion(ticket, version);
         ticket.SetTitle(title);
         ticket.SetDescription(description);
         ticket.SetPriority(priority);
+
         await _ticketRepository.SaveChangesAsync(cancellationToken);
         return ticket;
     }

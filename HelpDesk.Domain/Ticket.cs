@@ -14,6 +14,7 @@ public class Ticket
     private readonly List<Comment> _comments = [];
     public IReadOnlyCollection<Comment> Comments => _comments.AsReadOnly();
     public User? Requester { get; private set; }
+    public byte[] Version { get; private set; } = [];
 
     public Ticket(int id, string title, string description, TicketPriority priority, User? assignedUser = null)
     {

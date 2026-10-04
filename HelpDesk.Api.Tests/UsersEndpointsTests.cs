@@ -8,12 +8,27 @@ using System.Net.Http.Json;
 
 namespace HelpDesk.Api.Tests;
 
-public class UsersEndpointsTests
+[Collection("Api integration tests")]
+public class UsersEndpointsTests : IAsyncLifetime
 {
+    private readonly ApiTestFixture _fixture;
+
+    public UsersEndpointsTests(ApiTestFixture fixture)
+    {
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.ResetDatabaseAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
+
     [Fact]
     public async Task RegisterUser_WithValidRequest_ShouldReturn201Created()
     {
-        using var factory = new HelpDeskApiFactory();
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var request = new RegisterUserRequest
@@ -52,7 +67,7 @@ public class UsersEndpointsTests
     [Fact]
     public async Task RegisterUser_WithDuplicateEmail_ShouldReturn409BadConflict()
     {
-        using var factory = new HelpDeskApiFactory();
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
         var request = new RegisterUserRequest
         {
@@ -89,7 +104,7 @@ public class UsersEndpointsTests
     [InlineData("John", "Doe", "john.doe@example.com", "2Short")]
     public async Task RegisterUser_WithInvalidRequest_ShouldReturn400BadRequest(string firstname, string lastname, string email, string password)
     {
-        using var factory = new HelpDeskApiFactory();
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var request = new RegisterUserRequest

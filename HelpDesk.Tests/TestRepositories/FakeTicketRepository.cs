@@ -68,5 +68,10 @@ namespace HelpDesk.Tests.TestRepositories
         {
             throw new NotImplementedException();
         }
+
+        public void SetExpectedVersion(Ticket ticket, byte[] expectedVersion)
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
 using HelpDesk.Api.Mappings;
-using HelpDesk.Application.Services;
 using HelpDesk.Application.Services.Tickets;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Authorization;
@@ -71,7 +70,8 @@ public class TicketsController : ControllerBase
             ticket.Priority.ToString(),
             ticket.Status.ToString(),
             ticket.CreationDate,
-            null);
+            null,
+            ticket.Version);
 
         return CreatedAtAction(nameof(GetById), new { id = ticket.Id }, response);
     }
@@ -156,7 +156,7 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
+        await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, request.Version, cancellationToken);
         var updatedTicket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
         return Ok(updatedTicket.ToDetailsResponse());
     }
@@ -188,7 +188,7 @@ public class TicketsController : ControllerBase
             priority = parsedPriority;
         }
 
-        await _ticketPatchService.PatchAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
+        await _ticketPatchService.PatchAsync(ticketId, request.Version, request.Title, request.Description, priority, cancellationToken);
 
         var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
         return Ok(ticket.ToDetailsResponse());
