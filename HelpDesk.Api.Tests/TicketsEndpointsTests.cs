@@ -1299,7 +1299,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     }
 
     [Fact]
-    public async Task UpdateTicket_WithOldTicketVersion_ShouldThrowDbUpdateConcurrencyException()
+    public async Task UpdateTicket_WithStaleVersion_ShouldReturnConflict()
     {
         using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
@@ -1355,6 +1355,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
         Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
         var problem = await updateResponse.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(problem);
+        Assert.NotNull(problem.Detail);
         Assert.Contains("has been modified by another user", problem.Detail);
         using (var scope = factory.Services.CreateScope())
         {
