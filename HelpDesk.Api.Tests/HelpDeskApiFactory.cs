@@ -66,12 +66,4 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>
 
         return host;
     }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-
-        //if (disposing)
-        //    _connection.Dispose();
-    }
 }

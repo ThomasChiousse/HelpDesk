@@ -32,7 +32,7 @@ public sealed class ApiTestFixture : IAsyncLifetime
         Factory = new HelpDeskApiFactory(ConnectionString);
 
         // Force le démarrage du host + Migrate()
-        _ = Factory.CreateClient();
+        using var client = Factory.CreateClient();
 
         await using var connection = new SqlConnection(ConnectionString);
 
