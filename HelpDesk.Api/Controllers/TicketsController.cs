@@ -188,7 +188,7 @@ public class TicketsController : ControllerBase
             priority = parsedPriority;
         }
 
-        await _ticketPatchService.PatchAsync(ticketId, request.Title, request.Description, priority, cancellationToken);
+        await _ticketPatchService.PatchAsync(ticketId, request.Version, request.Title, request.Description, priority, cancellationToken);
 
         var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
         return Ok(ticket.ToDetailsResponse());

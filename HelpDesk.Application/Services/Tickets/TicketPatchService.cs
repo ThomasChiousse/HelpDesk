@@ -11,9 +11,11 @@ public class TicketPatchService
         _ticketRepository = ticketRepository;
     }
 
-    public async Task PatchAsync(int ticketId, string? title = null, string? description = null, TicketPriority? priority = null, CancellationToken cancellationToken = default)
+    public async Task PatchAsync(int ticketId, byte[] version, string? title = null, string? description = null, TicketPriority? priority = null, CancellationToken cancellationToken = default)
     {
         var ticket = await _ticketRepository.GetByIdAsync(ticketId, cancellationToken) ?? throw new KeyNotFoundException($"Ticket with ID {ticketId} not found.");
+        _ticketRepository.SetExpectedVersion(ticket, version);
+
         if (title is not null)
             ticket.SetTitle(title);
         if (description is not null)

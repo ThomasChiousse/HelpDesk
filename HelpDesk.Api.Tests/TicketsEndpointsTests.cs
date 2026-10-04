@@ -14,8 +14,15 @@ using System.Net.Http.Json;
 
 namespace HelpDesk.Api.Tests;
 
-public class TicketsEndpointsTests
+public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
 {
+    private readonly MsSqlFixture _sql;
+
+    public TicketsEndpointsTests(MsSqlFixture sql)
+    {
+        _sql = sql;
+    }
+
     #region Helpers
     private static async Task<int> SeedUserWithPasswordAsync(
     HelpDeskApiFactory factory,
@@ -78,7 +85,7 @@ public class TicketsEndpointsTests
     public async Task PostTicket_WithAuthenticatedUser_ShouldReturnCreated(UserRole role)
     {
         // arrange
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -120,7 +127,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PostTicket_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
 
         var client = factory.CreateClient();
 
@@ -147,7 +154,7 @@ public class TicketsEndpointsTests
     [InlineData("Banana")]
     public async Task PostTicket_WithInvalidPriority_ShouldReturnBadRequest(string priority)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         int userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -178,7 +185,7 @@ public class TicketsEndpointsTests
     [InlineData(124)]
     public async Task GetTicket_WithUnknownId_ShouldReturnNotFound(int id)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -197,7 +204,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTicket_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
 
         int ticketId;
@@ -218,7 +225,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTicket_AsRequester_ShouldReturnOk()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -250,7 +257,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTicket_AsDifferentUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -280,7 +287,7 @@ public class TicketsEndpointsTests
     [InlineData(UserRole.Technician)]
     public async Task GetTicket_AsTechOrAdmin_ShouldReturnOk(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -310,7 +317,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AssignUser_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -340,7 +347,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AssignUser_WithUnknownUser_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -369,7 +376,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AssignUser_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
 
         int ticketId;
@@ -402,7 +409,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AssignUser_WithUserRole_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -447,7 +454,7 @@ public class TicketsEndpointsTests
     [InlineData(UserRole.Administrator)]
     public async Task AssignUser_WithAllowedRole_ShouldBeAllowed(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -497,7 +504,7 @@ public class TicketsEndpointsTests
     [InlineData(UserRole.Technician)]
     public async Task UnassignUser_WithAllowedRole_ShouldUnassignUser(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -544,7 +551,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UnassignUser_WithSimpleUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -599,7 +606,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UnassignUser_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
 
         int ticketId, assigneeId;
@@ -643,7 +650,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UnassignUser_WhenUserIsNotAssigned_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -698,7 +705,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UnassignUser_WhenTicketHasNoAssignedUser_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -729,7 +736,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UnassignUser_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -744,7 +751,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AddComment_WithAuthenticatedUser_ShouldUseAuthenticatedUserAsAuthor()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -794,7 +801,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AddComment_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -811,7 +818,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AddComment_ToClosedTicket_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -856,7 +863,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AddComment_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
         int ticketId;
         using (var scope = factory.Services.CreateScope())
@@ -884,7 +891,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AddComment_WithDifferentAuthorIdInBody_ShouldNotAllowImpersonation()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId1 = await SeedUserWithPasswordAsync(factory);
         var userId2 = await SeedUserWithPasswordAsync(factory, "jane@example.com", "second-password");
 
@@ -920,7 +927,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AddComment_AsDifferentUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         int userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -932,6 +939,7 @@ public class TicketsEndpointsTests
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
             var requester = new User("Reeee", "Quester", "requester@example.com", UserRole.User);
             var ticket = new Ticket("Screen problem", "Screen only shows black&white", TicketPriority.Normal, requester: requester);
+
             await context.Tickets.AddAsync(ticket);
             await context.Users.AddAsync(requester);
             await context.SaveChangesAsync();
@@ -961,7 +969,7 @@ public class TicketsEndpointsTests
     [InlineData(UserRole.Technician)]
     public async Task AdvanceStatus_WithAllowedRole_ShouldAdvanceStatus(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -994,7 +1002,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AdvanceStatus_AsSimpleUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -1028,7 +1036,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AdvanceStatus_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
 
         int ticketId;
@@ -1056,7 +1064,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AdvanceStatus_WhenTicketIsAlreadyClosed_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1090,7 +1098,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task AdvanceStatus_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1107,13 +1115,14 @@ public class TicketsEndpointsTests
     [InlineData(UserRole.Technician)]
     public async Task UpdateTicket_WithAllowedRole_ShouldUpdateTicket(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
         int ticketId;
+        byte[] ticketVersion;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1124,12 +1133,14 @@ public class TicketsEndpointsTests
             await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
             ticketId = ticket.Id;
+            ticketVersion = ticket.Version;
         }
         var updateRequest = new UpdateTicketRequest
         {
             Title = "New Title",
             Description = "New Description",
-            Priority = "High"
+            Priority = "High",
+            Version = ticketVersion
         };
         var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -1152,7 +1163,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UpdateTicket_AsSimpleUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -1194,7 +1205,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UpdateTicket_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
 
         int ticketId;
@@ -1233,7 +1244,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UpdateTicket_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1243,7 +1254,8 @@ public class TicketsEndpointsTests
         {
             Title = "New Title",
             Description = "New Description",
-            Priority = "High"
+            Priority = "High",
+            Version = [0, 1, 2, 3, 4, 5, 6, 7]
         };
         var updateResponse = await client.PutAsJsonAsync($"/api/tickets/999", updateRequest);
         Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
@@ -1252,7 +1264,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UpdateTicket_WithInvalidPriority_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1271,7 +1283,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task UpdateTicket_WithInvalidTitle_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1292,13 +1304,14 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PatchTicket_WithOnlyTitle_ShouldOnlyUpdateTitle()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
         int ticketId;
+        byte[] ticketVersion;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1309,11 +1322,13 @@ public class TicketsEndpointsTests
             await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
             ticketId = ticket.Id;
+            ticketVersion = ticket.Version;
         }
 
         var patchRequest = new PatchTicketRequest
         {
-            Title = "New Title"
+            Title = "New Title",
+            Version = ticketVersion
         };
         var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
@@ -1327,13 +1342,14 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PatchTicket_WithOnlyPriority_ShouldOnlyUpdatePriority()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
         int ticketId;
+        byte[] ticketVersion;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1344,11 +1360,13 @@ public class TicketsEndpointsTests
             await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
             ticketId = ticket.Id;
+            ticketVersion = ticket.Version;
         }
 
         var patchRequest = new PatchTicketRequest
         {
-            Priority = "High"
+            Priority = "High",
+            Version = ticketVersion
         };
         var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
@@ -1362,7 +1380,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PatchTicket_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1370,7 +1388,8 @@ public class TicketsEndpointsTests
 
         var patchRequest = new PatchTicketRequest
         {
-            Title = "New Title"
+            Title = "New Title",
+            Version = [1, 2, 3, 4, 5, 6, 7, 8]
         };
         var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/999", patchRequest);
         Assert.Equal(HttpStatusCode.NotFound, patchResponse.StatusCode);
@@ -1379,7 +1398,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PatchTicket_WithInvalidPriority_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1418,7 +1437,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PatchTicket_WithInvalidTitle_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1458,7 +1477,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PatchTicket_WithEmptyRequest_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1493,7 +1512,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PatchTicket_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         using var client = factory.CreateClient();
 
         int ticketId;
@@ -1531,13 +1550,14 @@ public class TicketsEndpointsTests
     [InlineData(UserRole.Technician)]
     public async Task PatchTicket_WithAllowedRole_ShouldPatchTicket(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
         int ticketId;
+        byte[] ticketVersion;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1550,13 +1570,15 @@ public class TicketsEndpointsTests
             await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
             ticketId = ticket.Id;
+            ticketVersion = ticket.Version;
         }
 
         var patchRequest = new PatchTicketRequest
         {
             Title = "New Title",
             Description = "New Description",
-            Priority = "High"
+            Priority = "High",
+            Version = ticketVersion
         };
         var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
@@ -1574,7 +1596,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task PatchTicket_AsSimpleUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -1658,7 +1680,7 @@ public class TicketsEndpointsTests
     [InlineData(UserRole.Administrator)]
     public async Task GetTickets_WithAllowedRole_ShouldReturnOk(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -1727,7 +1749,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_AsUser_ShouldReturnOnlyOwnTickets()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         int loggedUserId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -1770,7 +1792,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
 
         HelpDeskDbContext? context = null;
@@ -1787,7 +1809,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithInvalidStatus_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1800,7 +1822,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithInvalidPriority_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1813,7 +1835,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithHasAssigneeFalseAndAssignedUserId_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1826,7 +1848,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithTitleSearch_ShouldReturnFilteredTickets()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1861,7 +1883,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithDescriptionSearch_ShouldReturnFilteredTickets()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1896,7 +1918,7 @@ public class TicketsEndpointsTests
 
     public async Task GetTickets_WithUserAssignedId_ShouldReturnFilteredTickets()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1939,7 +1961,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithUserAssignedIdNull_ShouldReturnAllTickets()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1960,7 +1982,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WhenHasAssigneeIsTrue_ShouldReturnFilteredTicketsWithAssignee()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1997,7 +2019,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WhenHasAssigneeIsFalse_ShouldReturnFilteredTicketsWithoutAssignee()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
 
         var client = factory.CreateClient();
@@ -2034,7 +2056,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithMultipleFilters_ShouldReturnFilteredTickets()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2077,7 +2099,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithOOBPaging_ShouldReturnEmptyItems()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2101,7 +2123,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithInvalidPageRelatedRequest_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2118,7 +2140,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetTickets_WithNoMatchSearch_ShouldReturnEmptyItems()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2197,7 +2219,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetSortedTickets_WithSortByAscTitle_ShouldReturnTicketsSortedByAscTitle()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2226,7 +2248,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetSortedTickets_WithSortByDescTitle_ShouldReturnTicketsSortedByDescTitle()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2255,7 +2277,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetSortedTickets_WithSortByAscPriority_ShouldReturnTicketsSortedByAscPriority()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Technician);
 
         var client = factory.CreateClient();
@@ -2291,7 +2313,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetSortedTickets_WithSortByDescStatus_ShouldReturnTicketsSortedByDescStatus()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2328,7 +2350,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetSortedTickets_WithNoSortOption_ShouldReturnTicketsSortedByDescCreationDate()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2368,7 +2390,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetSortedTickets_WithInvalidSortBy_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -2381,7 +2403,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetSortedTickets_WithInvalidSortDirection_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
 
         var client = factory.CreateClient();
@@ -2394,7 +2416,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetSortedTickets_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
 
         using (var scope = factory.Services.CreateScope())
@@ -2469,7 +2491,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetComments_WithValidRequest_ShouldReturnOk()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2513,7 +2535,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetComments_WithPagedDataRequest_ShouldReturnOkAndProperlyPagedItems()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2554,7 +2576,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetComments_WhenTicketDoesNotExists_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
 
         var client = factory.CreateClient();
@@ -2571,7 +2593,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetComments_WhenTicketDoesNotContainComments_ShouldReturnOkAndEmptyItems()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -2605,7 +2627,7 @@ public class TicketsEndpointsTests
     public async Task GetComments_WithInvalidPagination_ShouldReturnBadRequest(
     string url)
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2619,7 +2641,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetComments_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var client = factory.CreateClient();
 
         int ticketId;
@@ -2639,7 +2661,7 @@ public class TicketsEndpointsTests
     [Fact]
     public async Task GetComments_AsDifferentUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory();
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
