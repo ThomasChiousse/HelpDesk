@@ -1,4 +1,5 @@
 ﻿using HelpDesk.Application.Common.Pagination;
+using HelpDesk.Application.Exceptions;
 using HelpDesk.Application.Repositories;
 using HelpDesk.Application.Sorting;
 using HelpDesk.Application.Tickets.Queries;
@@ -25,7 +26,14 @@ public class TicketRepository : ITicketRepository
     public async Task SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            throw new TicketConcurrencyException(ex);
+        }
     }
 
     public async Task<Ticket?> GetByIdAsync(

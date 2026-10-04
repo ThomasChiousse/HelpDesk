@@ -959,7 +959,6 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
             Assert.Empty(context.Comments);
         }
-
     }
     #endregion
 
@@ -1297,6 +1296,76 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
         };
         var updateResponse = await client.PutAsJsonAsync($"/api/tickets/1", updateRequest);
         Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithOldTicketVersion_ShouldThrowDbUpdateConcurrencyException()
+    {
+        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var userId = await SeedUserWithPasswordAsync(factory);
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        byte[] oldTicketVersion;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+            oldTicketVersion = ticket.Version;
+        }
+
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketDetails = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketDetails);
+        Assert.Equal(oldTicketVersion, ticketDetails.Version);
+
+        var updateRequest1 = new UpdateTicketRequest
+        {
+            Title = "Another Title",
+            Description = "Another Description",
+            Priority = "Low",
+            Version = oldTicketVersion
+        };
+        var updateResponse1 = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest1);
+        Assert.Equal(HttpStatusCode.OK, updateResponse1.StatusCode);
+        var ticketDetailsAfterFirstUpdate = await updateResponse1.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketDetailsAfterFirstUpdate);
+        var newVersion = ticketDetailsAfterFirstUpdate.Version;
+        Assert.NotEqual(oldTicketVersion, newVersion);
+        Assert.Equal("Another Title", ticketDetailsAfterFirstUpdate.Title);
+        Assert.Equal("Another Description", ticketDetailsAfterFirstUpdate.Description);
+        Assert.Equal("Low", ticketDetailsAfterFirstUpdate.Priority);
+
+        var updateRequest2 = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High",
+            Version = oldTicketVersion
+        };
+        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest2);
+        Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
+        var problem = await updateResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Contains("has been modified by another user", problem.Detail);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var persistedTicket = await context.Tickets.SingleAsync(t => t.Id == ticketId);
+            Assert.NotNull(persistedTicket);
+            Assert.Equal("Another Title", persistedTicket.Title);
+            Assert.Equal("Another Description", persistedTicket.Description);
+            Assert.Equal(TicketPriority.Low, persistedTicket.Priority);
+            Assert.Equal(newVersion, persistedTicket.Version);
+        }
     }
     #endregion
 
