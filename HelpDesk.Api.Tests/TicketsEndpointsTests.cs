@@ -14,13 +14,24 @@ using System.Net.Http.Json;
 
 namespace HelpDesk.Api.Tests;
 
-public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
+[Collection("Api integration tests")]
+public class TicketsEndpointsTests : IAsyncLifetime
 {
-    private readonly MsSqlFixture _sql;
+    private readonly ApiTestFixture _fixture;
 
-    public TicketsEndpointsTests(MsSqlFixture sql)
+    public TicketsEndpointsTests(ApiTestFixture fixture)
     {
-        _sql = sql;
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.ResetDatabaseAsync();
+    }
+
+    public Task DisposeAsync()
+    {
+        return Task.CompletedTask;
     }
 
     #region Helpers
@@ -85,7 +96,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     public async Task PostTicket_WithAuthenticatedUser_ShouldReturnCreated(UserRole role)
     {
         // arrange
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -127,7 +138,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PostTicket_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
 
         var client = factory.CreateClient();
 
@@ -154,7 +165,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData("Banana")]
     public async Task PostTicket_WithInvalidPriority_ShouldReturnBadRequest(string priority)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         int userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -185,7 +196,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData(124)]
     public async Task GetTicket_WithUnknownId_ShouldReturnNotFound(int id)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -204,7 +215,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTicket_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         int ticketId;
@@ -225,7 +236,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTicket_AsRequester_ShouldReturnOk()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -257,7 +268,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTicket_AsDifferentUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -287,7 +298,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData(UserRole.Technician)]
     public async Task GetTicket_AsTechOrAdmin_ShouldReturnOk(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -317,7 +328,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AssignUser_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -347,7 +358,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AssignUser_WithUnknownUser_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -376,7 +387,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AssignUser_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         int ticketId;
@@ -409,7 +420,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AssignUser_WithUserRole_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -454,7 +465,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData(UserRole.Administrator)]
     public async Task AssignUser_WithAllowedRole_ShouldBeAllowed(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -504,7 +515,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData(UserRole.Technician)]
     public async Task UnassignUser_WithAllowedRole_ShouldUnassignUser(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -551,7 +562,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UnassignUser_WithSimpleUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -606,7 +617,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UnassignUser_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         int ticketId, assigneeId;
@@ -650,7 +661,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UnassignUser_WhenUserIsNotAssigned_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -705,7 +716,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UnassignUser_WhenTicketHasNoAssignedUser_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -736,7 +747,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UnassignUser_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -751,7 +762,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AddComment_WithAuthenticatedUser_ShouldUseAuthenticatedUserAsAuthor()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -801,7 +812,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AddComment_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -818,7 +829,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AddComment_ToClosedTicket_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -863,7 +874,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AddComment_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
         int ticketId;
         using (var scope = factory.Services.CreateScope())
@@ -891,7 +902,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AddComment_WithDifferentAuthorIdInBody_ShouldNotAllowImpersonation()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId1 = await SeedUserWithPasswordAsync(factory);
         var userId2 = await SeedUserWithPasswordAsync(factory, "jane@example.com", "second-password");
 
@@ -927,7 +938,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AddComment_AsDifferentUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         int userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -968,7 +979,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData(UserRole.Technician)]
     public async Task AdvanceStatus_WithAllowedRole_ShouldAdvanceStatus(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -1001,7 +1012,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AdvanceStatus_AsSimpleUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -1035,7 +1046,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AdvanceStatus_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         int ticketId;
@@ -1063,7 +1074,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AdvanceStatus_WhenTicketIsAlreadyClosed_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1097,7 +1108,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task AdvanceStatus_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1114,7 +1125,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData(UserRole.Technician)]
     public async Task UpdateTicket_WithAllowedRole_ShouldUpdateTicket(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -1162,7 +1173,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UpdateTicket_AsSimpleUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -1204,7 +1215,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UpdateTicket_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         int ticketId;
@@ -1243,7 +1254,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UpdateTicket_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1263,7 +1274,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UpdateTicket_WithInvalidPriority_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1282,7 +1293,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UpdateTicket_WithInvalidTitle_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1301,7 +1312,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task UpdateTicket_WithStaleVersion_ShouldReturnConflict()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
@@ -1374,7 +1385,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PatchTicket_WithOnlyTitle_ShouldOnlyUpdateTitle()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1412,7 +1423,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PatchTicket_WithOnlyPriority_ShouldOnlyUpdatePriority()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1450,7 +1461,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PatchTicket_WithUnknownTicket_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1468,7 +1479,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PatchTicket_WithInvalidPriority_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1507,7 +1518,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PatchTicket_WithInvalidTitle_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1547,7 +1558,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PatchTicket_WithEmptyRequest_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1582,7 +1593,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PatchTicket_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         using var client = factory.CreateClient();
 
         int ticketId;
@@ -1620,7 +1631,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData(UserRole.Technician)]
     public async Task PatchTicket_WithAllowedRole_ShouldPatchTicket(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -1666,7 +1677,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task PatchTicket_AsSimpleUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -1709,31 +1720,25 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
 
     #region GetTickets
     #region Part 1
-    private static async Task CreateNecessaryContextForGetTickets(HelpDeskDbContext context)
+    private static async Task<(int[], int[])> CreateNecessaryContextForGetTickets(HelpDeskDbContext context)
     {
         // Create tickets with different priorities and statuses
-        await context.Tickets.AddAsync(new Ticket("Ticket Title 1", "Ticket Description 1", TicketPriority.High));
-        await context.Tickets.AddAsync(new Ticket("Ticket Title 2", "Ticket Description 2", TicketPriority.High));
-        await context.Tickets.AddAsync(new Ticket("Ticket Title 3", "Ticket Description 3", TicketPriority.High));
-        await context.Tickets.AddAsync(new Ticket("Ticket Title 4", "Ticket Description 4", TicketPriority.High));
-        await context.Tickets.AddAsync(new Ticket("Ticket Title 5", "Ticket Description 5", TicketPriority.Normal));
-        await context.Tickets.AddAsync(new Ticket("Ticket Title 6", "Ticket Description 6", TicketPriority.High));
+        var ticket1 = new Ticket("Ticket Title 1", "Ticket Description 1", TicketPriority.High);
+        var ticket2 = new Ticket("Ticket Title 2", "Ticket Description 2", TicketPriority.High);
+        var ticket3 = new Ticket("Ticket Title 3", "Ticket Description 3", TicketPriority.High);
+        var ticket4 = new Ticket("Ticket Title 4", "Ticket Description 4", TicketPriority.High);
+        var ticket5 = new Ticket("Ticket Title 5", "Ticket Description 5", TicketPriority.Normal);
+        var ticket6 = new Ticket("Ticket Title 6", "Ticket Description 6", TicketPriority.High);
+        await context.Tickets.AddRangeAsync(ticket1, ticket2, ticket3, ticket4, ticket5, ticket6);
 
         // Create users with different roles
-        await context.Users.AddAsync(new User("John", "Doe", "john.doe@example.com", UserRole.User));
-        await context.Users.AddAsync(new User("Jane", "Smith", "jane.smith@example.com", UserRole.Technician));
-        await context.Users.AddAsync(new User("Thomas", "DoesWhatHeCanLol", "thomas.doeswhathecanlol@example.com", UserRole.Administrator));
+        var user1 = new User("John", "Doe", "john.doe@example.com", UserRole.User);
+        var user2 = new User("Jane", "Smith", "jane.smith@example.com", UserRole.Technician);
+        var user3 = new User("Thomas", "DoesWhatHeCanLol", "thomas.doeswhathecanlol@example.com", UserRole.Administrator);
+        await context.Users.AddRangeAsync(user1, user2, user3);
         await context.SaveChangesAsync();
 
-        var ticket3 = context.Tickets.First(t => t.Title == "Ticket Title 3");
-        var ticket4 = context.Tickets.First(t => t.Title == "Ticket Title 4");
-        var ticket5 = context.Tickets.First(t => t.Title == "Ticket Title 5");
-        var ticket6 = context.Tickets.First(t => t.Title == "Ticket Title 6");
         ticket6.AdvanceStatus(); // open -> in progress
-
-        var user1 = context.Users.First(u => u.Firstname == "John");
-        var user2 = context.Users.First(u => u.Firstname == "Jane");
-        var user3 = context.Users.First(u => u.Firstname == "Thomas");
 
         // assign users
         // ticket1.AssignedUser is null
@@ -1743,6 +1748,8 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
         ticket5.AssignUser(user2);
         ticket6.AssignUser(user3);
         await context.SaveChangesAsync();
+
+        return ([ticket1.Id, ticket2.Id, ticket3.Id, ticket4.Id, ticket5.Id, ticket6.Id], [user1.Id, user2.Id, user3.Id]);
     }
 
     [Theory]
@@ -1750,7 +1757,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData(UserRole.Administrator)]
     public async Task GetTickets_WithAllowedRole_ShouldReturnOk(UserRole role)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: role);
 
         var client = factory.CreateClient();
@@ -1819,7 +1826,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_AsUser_ShouldReturnOnlyOwnTickets()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         int loggedUserId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -1862,7 +1869,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         HelpDeskDbContext? context = null;
@@ -1879,7 +1886,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithInvalidStatus_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1892,7 +1899,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithInvalidPriority_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1905,7 +1912,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithHasAssigneeFalseAndAssignedUserId_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1918,7 +1925,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithTitleSearch_ShouldReturnFilteredTickets()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1953,7 +1960,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithDescriptionSearch_ShouldReturnFilteredTickets()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -1988,18 +1995,19 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
 
     public async Task GetTickets_WithUserAssignedId_ShouldReturnFilteredTickets()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
+        int[] usersIds;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            await CreateNecessaryContextForGetTickets(context);
+            (_, usersIds) = await CreateNecessaryContextForGetTickets(context);
         }
-        var response = await client.GetAsync($"/api/tickets?assignedUserId=1");
+        var response = await client.GetAsync($"/api/tickets?assignedUserId={usersIds[0]}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var pagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<TicketListItemResponse>>();
         Assert.NotNull(pagedResponse);
@@ -2011,7 +2019,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
             expectedTickets = await context.Tickets
-                .Where(t => t.AssignedUser != null && t.AssignedUser.Id == 1).OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
+                .Where(t => t.AssignedUser != null && t.AssignedUser.Id == usersIds[0]).OrderByDescending(t => t.CreationDate).ThenByDescending(t => t.Id)
                 .ToListAsync();
         }
         Assert.Equal(2, expectedTickets.Count);
@@ -2031,7 +2039,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithUserAssignedIdNull_ShouldReturnAllTickets()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2052,7 +2060,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WhenHasAssigneeIsTrue_ShouldReturnFilteredTicketsWithAssignee()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2089,7 +2097,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WhenHasAssigneeIsFalse_ShouldReturnFilteredTicketsWithoutAssignee()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
 
         var client = factory.CreateClient();
@@ -2126,16 +2134,17 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithMultipleFilters_ShouldReturnFilteredTickets()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
+        int[] ticketsIds;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            await CreateNecessaryContextForGetTickets(context);
+            (ticketsIds, _) = await CreateNecessaryContextForGetTickets(context);
         }
 
         var response = await client.GetAsync("/api/tickets?status=open&priority=high&hasAssignee=true");
@@ -2145,8 +2154,8 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
         // expected tickets matchings filters : tickets 3 and 4
         Assert.Equal(2, pagedResponse.Items.Count);
         var filteredTickets = pagedResponse.Items;
-        Assert.Equal(4, filteredTickets.First().Id);
-        Assert.Equal(3, filteredTickets.Last().Id);
+        Assert.Equal(ticketsIds[3], filteredTickets.First().Id);
+        Assert.Equal(ticketsIds[2], filteredTickets.Last().Id);
         Assert.All(filteredTickets, t =>
         {
             Assert.Equal("High", t.Priority);
@@ -2169,7 +2178,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithOOBPaging_ShouldReturnEmptyItems()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2193,7 +2202,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithInvalidPageRelatedRequest_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2210,7 +2219,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetTickets_WithNoMatchSearch_ShouldReturnEmptyItems()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2289,7 +2298,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetSortedTickets_WithSortByAscTitle_ShouldReturnTicketsSortedByAscTitle()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2318,7 +2327,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetSortedTickets_WithSortByDescTitle_ShouldReturnTicketsSortedByDescTitle()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2347,7 +2356,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetSortedTickets_WithSortByAscPriority_ShouldReturnTicketsSortedByAscPriority()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Technician);
 
         var client = factory.CreateClient();
@@ -2383,7 +2392,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetSortedTickets_WithSortByDescStatus_ShouldReturnTicketsSortedByDescStatus()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2420,7 +2429,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetSortedTickets_WithNoSortOption_ShouldReturnTicketsSortedByDescCreationDate()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2460,7 +2469,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetSortedTickets_WithInvalidSortBy_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -2473,7 +2482,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetSortedTickets_WithInvalidSortDirection_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
 
         var client = factory.CreateClient();
@@ -2486,7 +2495,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetSortedTickets_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         using (var scope = factory.Services.CreateScope())
@@ -2504,11 +2513,11 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
 
     #region GetComments
 
-    private static async Task CreateNecessaryContextForGetComments(HelpDeskDbContext context)
+    private static async Task<int> CreateNecessaryContextForGetComments(HelpDeskDbContext context)
     {
         // Create ticket to add comments to
-        Ticket ticket1 = new("Ticket Title 1", "Ticket Description 1", TicketPriority.High);
-        await context.Tickets.AddAsync(ticket1);
+        Ticket ticket = new("Ticket Title 1", "Ticket Description 1", TicketPriority.High);
+        await context.Tickets.AddAsync(ticket);
 
         // Create users with different roles
         User u1 = new("John", "Doe", "john.doe@example.com", UserRole.User);
@@ -2548,32 +2557,34 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
             .Property(t => t.CreationDate)
             .CurrentValue = new DateTime(2012, 10, 28, 0, 0, 0, DateTimeKind.Utc);
 
-        ticket1.AddComment(c1);
-        ticket1.AddComment(c2);
-        ticket1.AddComment(c3);
-        ticket1.AddComment(c4);
-        ticket1.AddComment(c5);
-        ticket1.AddComment(c6);
+        ticket.AddComment(c1);
+        ticket.AddComment(c2);
+        ticket.AddComment(c3);
+        ticket.AddComment(c4);
+        ticket.AddComment(c5);
+        ticket.AddComment(c6);
         await context.SaveChangesAsync();
 
+        return ticket.Id;
     }
 
     [Fact]
     public async Task GetComments_WithValidRequest_ShouldReturnOk()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
+        int ticketId;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            await CreateNecessaryContextForGetComments(context);
+            ticketId = await CreateNecessaryContextForGetComments(context);
         }
 
-        var response = await client.GetAsync($"/api/tickets/1/comments");
+        var response = await client.GetAsync($"/api/tickets/{ticketId}/comments");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var commentPagedResponse = await response.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
         Assert.NotNull(commentPagedResponse);
@@ -2605,19 +2616,20 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetComments_WithPagedDataRequest_ShouldReturnOkAndProperlyPagedItems()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
         await AuthenticateUserAsync(factory, client, userId);
 
+        int ticketId;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
-            await CreateNecessaryContextForGetComments(context);
+            ticketId = await CreateNecessaryContextForGetComments(context);
         }
 
-        var response1 = await client.GetAsync($"/api/tickets/1/comments?pageSize=4&page=1");
+        var response1 = await client.GetAsync($"/api/tickets/{ticketId}/comments?pageSize=4&page=1");
         Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
         var commentPagedResponse1 = await response1.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
         Assert.NotNull(commentPagedResponse1);
@@ -2625,7 +2637,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
         Assert.NotNull(commentPagedResponse1.Items);
         Assert.Equal(4, commentPagedResponse1.Items.Count);
 
-        var response2 = await client.GetAsync($"/api/tickets/1/comments?pageSize=4&page=2");
+        var response2 = await client.GetAsync($"/api/tickets/{ticketId}/comments?pageSize=4&page=2");
         Assert.Equal(HttpStatusCode.OK, response2.StatusCode);
         var commentPagedResponse2 = await response2.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
         Assert.NotNull(commentPagedResponse2);
@@ -2634,7 +2646,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
         Assert.Equal(2, commentPagedResponse2.Items.Count);
         Assert.DoesNotContain(commentPagedResponse2.Items, c2 => commentPagedResponse1.Items.Any(c1 => c1.Id == c2.Id));
 
-        var response3 = await client.GetAsync($"/api/tickets/1/comments?pageSize=4&page=3");
+        var response3 = await client.GetAsync($"/api/tickets/{ticketId}/comments?pageSize=4&page=3");
         Assert.Equal(HttpStatusCode.OK, response3.StatusCode);
         var commentPagedResponse3 = await response3.Content.ReadFromJsonAsync<PagedResponse<CommentResponse>>();
         Assert.NotNull(commentPagedResponse3);
@@ -2646,7 +2658,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetComments_WhenTicketDoesNotExists_ShouldReturnNotFound()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.Administrator);
 
         var client = factory.CreateClient();
@@ -2663,7 +2675,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetComments_WhenTicketDoesNotContainComments_ShouldReturnOkAndEmptyItems()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();
@@ -2697,7 +2709,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     public async Task GetComments_WithInvalidPagination_ShouldReturnBadRequest(
     string url)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -2711,7 +2723,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetComments_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         int ticketId;
@@ -2731,7 +2743,7 @@ public class TicketsEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetComments_AsDifferentUser_ShouldReturnForbidden()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory, role: UserRole.User);
 
         var client = factory.CreateClient();

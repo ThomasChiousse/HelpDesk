@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -15,16 +14,9 @@ public class HelpDeskApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString;
 
-    public HelpDeskApiFactory(string serverConnectionString)
+    public HelpDeskApiFactory(string connectionString)
     {
-        var builder =
-            new SqlConnectionStringBuilder(serverConnectionString)
-            {
-                InitialCatalog =
-                    $"HelpDeskTests_{Guid.NewGuid():N}"
-            };
-
-        _connectionString = builder.ConnectionString;
+        _connectionString = connectionString;
     }
 
     protected override void ConfigureWebHost(

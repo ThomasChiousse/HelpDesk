@@ -8,19 +8,27 @@ using System.Net.Http.Json;
 
 namespace HelpDesk.Api.Tests;
 
-public class UsersEndpointsTests : IClassFixture<MsSqlFixture>
+[Collection("Api integration tests")]
+public class UsersEndpointsTests : IAsyncLifetime
 {
-    private readonly MsSqlFixture _sql;
+    private readonly ApiTestFixture _fixture;
 
-    public UsersEndpointsTests(MsSqlFixture sql)
+    public UsersEndpointsTests(ApiTestFixture fixture)
     {
-        _sql = sql;
+        _fixture = fixture;
     }
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.ResetDatabaseAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task RegisterUser_WithValidRequest_ShouldReturn201Created()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var request = new RegisterUserRequest
@@ -59,7 +67,7 @@ public class UsersEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task RegisterUser_WithDuplicateEmail_ShouldReturn409BadConflict()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
         var request = new RegisterUserRequest
         {
@@ -96,7 +104,7 @@ public class UsersEndpointsTests : IClassFixture<MsSqlFixture>
     [InlineData("John", "Doe", "john.doe@example.com", "2Short")]
     public async Task RegisterUser_WithInvalidRequest_ShouldReturn400BadRequest(string firstname, string lastname, string email, string password)
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var request = new RegisterUserRequest

@@ -13,13 +13,24 @@ using System.Text;
 
 namespace HelpDesk.Api.Tests;
 
-public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
+[Collection("Api integration tests")]
+public class AuthEndpointsTests : IAsyncLifetime
 {
-    private readonly MsSqlFixture _sql;
+    private readonly ApiTestFixture _fixture;
 
-    public AuthEndpointsTests(MsSqlFixture sql)
+    public AuthEndpointsTests(ApiTestFixture fixture)
     {
-        _sql = sql;
+        _fixture = fixture;
+    }
+
+    public async Task InitializeAsync()
+    {
+        await _fixture.ResetDatabaseAsync();
+    }
+
+    public Task DisposeAsync()
+    {
+        return Task.CompletedTask;
     }
 
     #region Prework/Helpers
@@ -87,7 +98,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetMe_WithoutToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var response = await client.GetAsync("/api/auth/me");
@@ -100,7 +111,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetMe_WithInvalidToken_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         client.DefaultRequestHeaders.Authorization =
@@ -118,7 +129,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task GetMe_WithValidToken_ShouldReturnOk()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var token = CreateValidJwt();
@@ -144,7 +155,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task Login_WithValidCredentials_ShouldReturnToken()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
 
         var userId = await SeedUserWithPasswordAsync(factory);
 
@@ -200,7 +211,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task Login_WithWrongPassword_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -213,7 +224,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task Login_WithUnknownEmail_ShouldReturnUnauthorized()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         await SeedUserWithPasswordAsync(factory);
 
         var client = factory.CreateClient();
@@ -226,7 +237,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task Login_WithEmptyEmail_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var request = new LoginRequest(
@@ -245,7 +256,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task Login_WithInvalidEmail_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var request = new LoginRequest(
@@ -264,7 +275,7 @@ public class AuthEndpointsTests : IClassFixture<MsSqlFixture>
     [Fact]
     public async Task Login_WithEmptyPassword_ShouldReturnBadRequest()
     {
-        using var factory = new HelpDeskApiFactory(_sql.ConnectionString);
+        var factory = _fixture.Factory;
         var client = factory.CreateClient();
 
         var request = new LoginRequest(
