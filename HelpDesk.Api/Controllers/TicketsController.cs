@@ -47,6 +47,10 @@ public class TicketsController : ControllerBase
             return Forbid();
         }
 
+        var version = Convert.ToBase64String(ticket.Version);
+
+        Response.Headers.ETag = $"\"{version}\"";
+
         return Ok(ticket.ToDetailsResponse());
     }
 

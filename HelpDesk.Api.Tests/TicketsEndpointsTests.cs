@@ -321,6 +321,32 @@ public class TicketsEndpointsTests : IAsyncLifetime
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
     }
+
+    [Fact]
+    public async Task GetTicket_ShouldReturnVersionAsETag()
+    {
+        var factory = _fixture.Factory;
+        var userId = await SeedUserWithPasswordAsync(factory);
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+        int ticketId;
+        byte[] version;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "A title", "A description", TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+            version = ticket.Version;
+        }
+        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        Assert.NotNull(getResponse.Headers.ETag);
+        Assert.Equal($"\"{Convert.ToBase64String(version)}\"", getResponse.Headers.ETag.Tag);
+    }
+
     #endregion
 
     #region AssignUser
