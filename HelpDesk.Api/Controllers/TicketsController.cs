@@ -169,7 +169,11 @@ public class TicketsController : ControllerBase
         var ifMatch = Request.Headers.IfMatch.ToString();
         if (!EntityTagHeaderValue.TryParse(ifMatch, out var etag))
         {
-            return StatusCode(StatusCodes.Status400BadRequest);
+            return BadRequest();
+        }
+        if (etag.IsWeak)
+        {
+            return BadRequest();
         }
 
         var base64Version = etag.Tag.Value.Trim('"');
@@ -180,12 +184,12 @@ public class TicketsController : ControllerBase
         }
         catch (FormatException)
         {
-            return StatusCode(StatusCodes.Status400BadRequest);
+            return BadRequest();
         }
 
-        if (expectedVersion is null || expectedVersion.Length != 8)
+        if (expectedVersion.Length != 8)
         {
-            return StatusCode(StatusCodes.Status400BadRequest);
+            return BadRequest();
         }
 
         await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, expectedVersion, cancellationToken);
@@ -254,6 +258,4 @@ public class TicketsController : ControllerBase
         var response = new PagedResponse<TicketListItemResponse>(items, request.Page, request.PageSize, result.TotalCount);
         return Ok(response);
     }
-
-
 }

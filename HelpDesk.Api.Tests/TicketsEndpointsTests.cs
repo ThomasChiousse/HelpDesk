@@ -87,10 +87,9 @@ public class TicketsEndpointsTests : IAsyncLifetime
             new AuthenticationHeaderValue("Bearer", loginResponse.Token);
     }
 
-    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string uri, byte[]? ticketVersion, object content = null!)
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string uri, byte[]? ticketVersion, object? content = null)
     {
-        var httpRequest = new HttpRequestMessage(method, uri)
-
+        using var httpRequest = new HttpRequestMessage(method, uri)
         {
             Content = content is null ? null : JsonContent.Create(content)
         };
@@ -1424,6 +1423,137 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Assert.Equal(newVersion, persistedTicket.Version);
         }
     }
+
+    [Fact]
+    public async Task UpdateTicket_WithoutIfMatch_ShouldReturnPreconditionRequired()
+    {
+        var factory = _fixture.Factory;
+        var userId = await SeedUserWithPasswordAsync(factory);
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var updateResponse = await SendAsync(client, HttpMethod.Put, $"/api/tickets/{ticketId}", null, updateRequest);
+        Assert.Equal(HttpStatusCode.PreconditionRequired, updateResponse.StatusCode);
+
+        var getResponse = await SendAsync(client, HttpMethod.Get, $"/api/tickets/{ticketId}", null);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketResponse = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketResponse);
+        Assert.Equal("Old Title", ticketResponse.Title);
+        Assert.Equal("Old Description", ticketResponse.Description);
+        Assert.Equal("Normal", ticketResponse.Priority);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithInvalidIfMatch_ShouldReturnBadRequest()
+    {
+        var factory = _fixture.Factory;
+        var userId = await SeedUserWithPasswordAsync(factory);
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var request = new HttpRequestMessage(HttpMethod.Put, $"/api/tickets/{ticketId}")
+        {
+            Content = JsonContent.Create(updateRequest)
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", "bad-if-match");
+
+        var updateResponse = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+
+        var getResponse = await SendAsync(client, HttpMethod.Get, $"/api/tickets/{ticketId}", null);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketResponse = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketResponse);
+        Assert.Equal("Old Title", ticketResponse.Title);
+        Assert.Equal("Old Description", ticketResponse.Description);
+        Assert.Equal("Normal", ticketResponse.Priority);
+    }
+
+    [Fact]
+    public async Task UpdateTicket_WithWeakETag_ShouldReturnBadRequest()
+    {
+        var factory = _fixture.Factory;
+        var userId = await SeedUserWithPasswordAsync(factory);
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+        }
+
+        var updateRequest = new UpdateTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+        var request = new HttpRequestMessage(HttpMethod.Put, $"/api/tickets/{ticketId}")
+        {
+            Content = JsonContent.Create(updateRequest)
+        };
+        EntityTagHeaderValue weakETag = new("\"abc123\"", isWeak: true);
+        request.Headers.IfMatch.Add(weakETag);
+
+        var updateResponse = await client.SendAsync(request);
+        Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
+
+        var getResponse = await SendAsync(client, HttpMethod.Get, $"/api/tickets/{ticketId}", null);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketResponse = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketResponse);
+        Assert.Equal("Old Title", ticketResponse.Title);
+        Assert.Equal("Old Description", ticketResponse.Description);
+        Assert.Equal("Normal", ticketResponse.Priority);
+    }
+
     #endregion
 
     #region PatchTicket
