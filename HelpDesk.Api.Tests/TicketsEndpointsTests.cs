@@ -1588,8 +1588,8 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Title = "New Title"
         };
         var patchResponse = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", ticketVersion, patchRequest);
-        //var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
+
         var updatedTicket = await patchResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(updatedTicket);
         Assert.Equal("New Title", updatedTicket.Title);
@@ -1626,8 +1626,8 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Priority = "High"
         };
         var patchResponse = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", ticketVersion, patchRequest);
-        // var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
+
         var updatedTicket = await patchResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(updatedTicket);
         Assert.Equal("Old Title", updatedTicket.Title);
@@ -1838,8 +1838,7 @@ public class TicketsEndpointsTests : IAsyncLifetime
         {
             Title = "New Title",
             Description = "New Description",
-            Priority = "High",
-            //Version = ticketVersion
+            Priority = "High"
         };
 
         var patchResponse = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", ticketVersion, patchRequest);

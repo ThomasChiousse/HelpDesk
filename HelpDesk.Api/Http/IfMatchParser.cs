@@ -1,5 +1,7 @@
 ﻿using Microsoft.Net.Http.Headers;
 
+namespace HelpDesk.Api.Http;
+
 public static class IfMatchParser
 {
     public static IfMatchParseResult Parse(HttpRequest request)

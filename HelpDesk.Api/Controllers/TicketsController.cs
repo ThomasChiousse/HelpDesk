@@ -1,4 +1,5 @@
 ﻿using HelpDesk.Api.Contracts.Tickets;
+using HelpDesk.Api.Http;
 using HelpDesk.Api.Mappings;
 using HelpDesk.Application.Services.Tickets;
 using HelpDesk.Domain;

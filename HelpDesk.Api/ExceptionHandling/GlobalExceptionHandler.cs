@@ -71,8 +71,11 @@ public class GlobalExceptionHandler : IExceptionHandler
                         StatusCodes.Status409Conflict =>
                             "Conflict",
 
+                        StatusCodes.Status412PreconditionFailed =>
+                            "Precondition failed",
+
                         _ =>
-                            "An unexpected error occurred"
+                        "An unexpected error occurred"
                     },
 
                     Detail = statusCode == 500
