@@ -173,8 +173,20 @@ public class TicketsController : ControllerBase
         }
 
         var base64Version = etag.Tag.Value.Trim('"');
-        var expectedVersion =
-            Convert.FromBase64String(base64Version);
+        byte[] expectedVersion;
+        try
+        {
+            expectedVersion = Convert.FromBase64String(base64Version);
+        }
+        catch (FormatException)
+        {
+            return StatusCode(StatusCodes.Status400BadRequest);
+        }
+
+        if (expectedVersion is null || expectedVersion.Length != 8)
+        {
+            return StatusCode(StatusCodes.Status400BadRequest);
+        }
 
         await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, expectedVersion, cancellationToken);
         var updatedTicket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);

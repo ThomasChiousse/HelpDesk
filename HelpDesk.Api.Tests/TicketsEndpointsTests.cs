@@ -86,6 +86,23 @@ public class TicketsEndpointsTests : IAsyncLifetime
         client.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", loginResponse.Token);
     }
+
+    private static async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string uri, byte[]? ticketVersion, object content = null!)
+    {
+        var httpRequest = new HttpRequestMessage(method, uri)
+
+        {
+            Content = content is null ? null : JsonContent.Create(content)
+        };
+
+        if (ticketVersion is not null)
+        {
+            httpRequest.Headers.IfMatch.Add(new EntityTagHeaderValue($"\"{Convert.ToBase64String(ticketVersion)}\""));
+        }
+
+        return await client.SendAsync(httpRequest);
+    }
+
     #endregion
 
     #region PostTicket
@@ -1177,8 +1194,8 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Description = "New Description",
             Priority = "High",
         };
-        client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", $"\"{Convert.ToBase64String(ticketVersion)}\"");
-        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest);
+
+        var updateResponse = await SendAsync(client, HttpMethod.Put, $"/api/tickets/{ticketId}", ticketVersion, updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedTicket = await updateResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
 
@@ -1359,7 +1376,7 @@ public class TicketsEndpointsTests : IAsyncLifetime
             oldTicketVersion = ticket.Version;
         }
 
-        var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
+        var getResponse = await SendAsync(client, HttpMethod.Get, $"/api/tickets/{ticketId}", null);
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var ticketDetails = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(ticketDetails);
@@ -1370,11 +1387,9 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Title = "Another Title",
             Description = "Another Description",
             Priority = "Low",
-            //Version = oldTicketVersion
         };
 
-        client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", $"\"{Convert.ToBase64String(oldTicketVersion)}\"");
-        var updateResponse1 = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest1);
+        var updateResponse1 = await SendAsync(client, HttpMethod.Put, $"/api/tickets/{ticketId}", oldTicketVersion, updateRequest1);
         Assert.Equal(HttpStatusCode.OK, updateResponse1.StatusCode);
         var ticketDetailsAfterFirstUpdate = await updateResponse1.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(ticketDetailsAfterFirstUpdate);
@@ -1389,12 +1404,12 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Title = "New Title",
             Description = "New Description",
             Priority = "High",
-            //Version = oldTicketVersion
+
         };
 
-        var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest2);
-        Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
-        var problem = await updateResponse.Content.ReadFromJsonAsync<ProblemDetails>();
+        var updateResponse2 = await SendAsync(client, HttpMethod.Put, $"/api/tickets/{ticketId}", oldTicketVersion, updateRequest2);
+        Assert.Equal(HttpStatusCode.Conflict, updateResponse2.StatusCode);
+        var problem = await updateResponse2.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(problem);
         Assert.NotNull(problem.Detail);
         Assert.Contains("has been modified by another user", problem.Detail);
