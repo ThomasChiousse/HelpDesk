@@ -44,7 +44,7 @@ public class GlobalExceptionHandler : IExceptionHandler
                 StatusCodes.Status409Conflict,
 
             TicketConcurrencyException =>
-                StatusCodes.Status409Conflict,
+                StatusCodes.Status412PreconditionFailed,
 
             _ =>
                 StatusCodes.Status500InternalServerError

@@ -81,11 +81,6 @@ namespace HelpDesk.Api.Contracts.Tickets
         public string? Description { get; init; }
 
         public string? Priority { get; init; }
-
-        [Required]
-        [MinLength(8)]
-        [MaxLength(8)]
-        public byte[] Version { get; init; } = [];
     }
 
     public class GetTicketsRequest

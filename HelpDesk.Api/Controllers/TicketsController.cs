@@ -4,7 +4,6 @@ using HelpDesk.Application.Services.Tickets;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
 
 namespace HelpDesk.Api.Controllers;
 
@@ -161,38 +160,21 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        if (!Request.Headers.ContainsKey(HeaderNames.IfMatch))
+        var ifMatchResult = IfMatchParser.Parse(Request);
+
+        if (ifMatchResult.Status == IfMatchParseStatus.Missing)
         {
             return StatusCode(StatusCodes.Status428PreconditionRequired);
         }
 
-        var ifMatch = Request.Headers.IfMatch.ToString();
-        if (!EntityTagHeaderValue.TryParse(ifMatch, out var etag))
-        {
-            return BadRequest();
-        }
-        if (etag.IsWeak)
+        if (ifMatchResult.Status == IfMatchParseStatus.Invalid)
         {
             return BadRequest();
         }
 
-        var base64Version = etag.Tag.Value.Trim('"');
-        byte[] expectedVersion;
-        try
-        {
-            expectedVersion = Convert.FromBase64String(base64Version);
-        }
-        catch (FormatException)
-        {
-            return BadRequest();
-        }
-
-        if (expectedVersion.Length != 8)
-        {
-            return BadRequest();
-        }
-
+        var expectedVersion = ifMatchResult.Version!;
         await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, expectedVersion, cancellationToken);
+
         var updatedTicket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
         return Ok(updatedTicket.ToDetailsResponse());
     }
@@ -224,7 +206,18 @@ public class TicketsController : ControllerBase
             priority = parsedPriority;
         }
 
-        await _ticketPatchService.PatchAsync(ticketId, request.Version, request.Title, request.Description, priority, cancellationToken);
+        var ifMatchResult = IfMatchParser.Parse(Request);
+        if (ifMatchResult.Status == IfMatchParseStatus.Missing)
+        {
+            return StatusCode(StatusCodes.Status428PreconditionRequired);
+        }
+        if (ifMatchResult.Status == IfMatchParseStatus.Invalid)
+        {
+            return BadRequest();
+        }
+
+        var expectedVersion = ifMatchResult.Version!;
+        await _ticketPatchService.PatchAsync(ticketId, expectedVersion, request.Title, request.Description, priority, cancellationToken);
 
         var ticket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
         return Ok(ticket.ToDetailsResponse());

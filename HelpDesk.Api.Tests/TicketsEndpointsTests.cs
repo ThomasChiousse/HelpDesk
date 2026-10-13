@@ -1353,7 +1353,7 @@ public class TicketsEndpointsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task UpdateTicket_WithStaleVersion_ShouldReturnConflict()
+    public async Task UpdateTicket_WithStaleETag_ShouldReturnPreconditionFailed()
     {
         var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
@@ -1407,7 +1407,7 @@ public class TicketsEndpointsTests : IAsyncLifetime
         };
 
         var updateResponse2 = await SendAsync(client, HttpMethod.Put, $"/api/tickets/{ticketId}", oldTicketVersion, updateRequest2);
-        Assert.Equal(HttpStatusCode.Conflict, updateResponse2.StatusCode);
+        Assert.Equal(HttpStatusCode.PreconditionFailed, updateResponse2.StatusCode);
         var problem = await updateResponse2.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(problem);
         Assert.NotNull(problem.Detail);
@@ -1463,8 +1463,10 @@ public class TicketsEndpointsTests : IAsyncLifetime
         Assert.Equal("Normal", ticketResponse.Priority);
     }
 
-    [Fact]
-    public async Task UpdateTicket_WithInvalidIfMatch_ShouldReturnBadRequest()
+    [Theory]
+    [InlineData("\"not-base64!\"")]
+    [InlineData("\"AQID\"")]
+    public async Task UpdateTicket_WithInvalidIfMatch_ShouldReturnBadRequest(string etag)
     {
         var factory = _fixture.Factory;
         var userId = await SeedUserWithPasswordAsync(factory);
@@ -1494,7 +1496,7 @@ public class TicketsEndpointsTests : IAsyncLifetime
         {
             Content = JsonContent.Create(updateRequest)
         };
-        request.Headers.TryAddWithoutValidation("If-Match", "bad-if-match");
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
 
         var updateResponse = await client.SendAsync(request);
         Assert.Equal(HttpStatusCode.BadRequest, updateResponse.StatusCode);
@@ -1583,10 +1585,10 @@ public class TicketsEndpointsTests : IAsyncLifetime
 
         var patchRequest = new PatchTicketRequest
         {
-            Title = "New Title",
-            Version = ticketVersion
+            Title = "New Title"
         };
-        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+        var patchResponse = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", ticketVersion, patchRequest);
+        //var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
         var updatedTicket = await patchResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(updatedTicket);
@@ -1621,10 +1623,10 @@ public class TicketsEndpointsTests : IAsyncLifetime
 
         var patchRequest = new PatchTicketRequest
         {
-            Priority = "High",
-            Version = ticketVersion
+            Priority = "High"
         };
-        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+        var patchResponse = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", ticketVersion, patchRequest);
+        // var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
         var updatedTicket = await patchResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
         Assert.NotNull(updatedTicket);
@@ -1644,10 +1646,10 @@ public class TicketsEndpointsTests : IAsyncLifetime
 
         var patchRequest = new PatchTicketRequest
         {
-            Title = "New Title",
-            Version = [1, 2, 3, 4, 5, 6, 7, 8]
+            Title = "New Title"
         };
-        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/999", patchRequest);
+
+        var patchResponse = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/999", [1, 2, 3, 4, 5, 6, 7, 8], patchRequest);
         Assert.Equal(HttpStatusCode.NotFound, patchResponse.StatusCode);
     }
 
@@ -1700,6 +1702,7 @@ public class TicketsEndpointsTests : IAsyncLifetime
         await AuthenticateUserAsync(factory, client, userId);
 
         int ticketId;
+        byte[] ticketVersion;
         using (var scope = factory.Services.CreateScope())
         {
             var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
@@ -1712,13 +1715,15 @@ public class TicketsEndpointsTests : IAsyncLifetime
             await context.Tickets.AddAsync(ticket);
             await context.SaveChangesAsync();
             ticketId = ticket.Id;
+            ticketVersion = ticket.Version;
         }
 
         var patchRequest = new PatchTicketRequest
         {
             Title = ""
         };
-        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+
+        var patchResponse = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", ticketVersion, patchRequest);
         Assert.Equal(HttpStatusCode.BadRequest, patchResponse.StatusCode);
 
         var getResponse = await client.GetAsync($"/api/tickets/{ticketId}");
@@ -1834,9 +1839,10 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Title = "New Title",
             Description = "New Description",
             Priority = "High",
-            Version = ticketVersion
+            //Version = ticketVersion
         };
-        var patchResponse = await client.PatchAsJsonAsync($"/api/tickets/{ticketId}", patchRequest);
+
+        var patchResponse = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", ticketVersion, patchRequest);
         Assert.Equal(HttpStatusCode.OK, patchResponse.StatusCode);
 
         using (var scope = factory.Services.CreateScope())
