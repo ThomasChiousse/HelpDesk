@@ -1176,8 +1176,8 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Title = "New Title",
             Description = "New Description",
             Priority = "High",
-            Version = ticketVersion
         };
+        client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", $"\"{Convert.ToBase64String(ticketVersion)}\"");
         var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest);
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
         var updatedTicket = await updateResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
@@ -1291,8 +1291,9 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Title = "New Title",
             Description = "New Description",
             Priority = "High",
-            Version = [0, 1, 2, 3, 4, 5, 6, 7]
         };
+        var version = new byte[] { 0, 1, 2, 3, 4, 5, 6, 7 };
+        client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", $"\"{Convert.ToBase64String(version)}\"");
         var updateResponse = await client.PutAsJsonAsync($"/api/tickets/999", updateRequest);
         Assert.Equal(HttpStatusCode.NotFound, updateResponse.StatusCode);
     }
@@ -1369,8 +1370,10 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Title = "Another Title",
             Description = "Another Description",
             Priority = "Low",
-            Version = oldTicketVersion
+            //Version = oldTicketVersion
         };
+
+        client.DefaultRequestHeaders.TryAddWithoutValidation("If-Match", $"\"{Convert.ToBase64String(oldTicketVersion)}\"");
         var updateResponse1 = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest1);
         Assert.Equal(HttpStatusCode.OK, updateResponse1.StatusCode);
         var ticketDetailsAfterFirstUpdate = await updateResponse1.Content.ReadFromJsonAsync<TicketDetailsResponse>();
@@ -1386,8 +1389,9 @@ public class TicketsEndpointsTests : IAsyncLifetime
             Title = "New Title",
             Description = "New Description",
             Priority = "High",
-            Version = oldTicketVersion
+            //Version = oldTicketVersion
         };
+
         var updateResponse = await client.PutAsJsonAsync($"/api/tickets/{ticketId}", updateRequest2);
         Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
         var problem = await updateResponse.Content.ReadFromJsonAsync<ProblemDetails>();

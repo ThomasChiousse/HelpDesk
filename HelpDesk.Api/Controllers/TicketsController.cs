@@ -4,6 +4,7 @@ using HelpDesk.Application.Services.Tickets;
 using HelpDesk.Domain;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace HelpDesk.Api.Controllers;
 
@@ -160,7 +161,22 @@ public class TicketsController : ControllerBase
             return ValidationProblem(ModelState);
         }
 
-        await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, request.Version, cancellationToken);
+        if (!Request.Headers.ContainsKey(HeaderNames.IfMatch))
+        {
+            return StatusCode(StatusCodes.Status428PreconditionRequired);
+        }
+
+        var ifMatch = Request.Headers.IfMatch.ToString();
+        if (!EntityTagHeaderValue.TryParse(ifMatch, out var etag))
+        {
+            return StatusCode(StatusCodes.Status400BadRequest);
+        }
+
+        var base64Version = etag.Tag.Value.Trim('"');
+        var expectedVersion =
+            Convert.FromBase64String(base64Version);
+
+        await _ticketUpdateService.UpdateAsync(ticketId, request.Title, request.Description, priority, expectedVersion, cancellationToken);
         var updatedTicket = await _ticketQueryService.GetByIdAsync(ticketId, cancellationToken);
         return Ok(updatedTicket.ToDetailsResponse());
     }

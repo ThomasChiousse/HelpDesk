@@ -70,11 +70,6 @@ namespace HelpDesk.Api.Contracts.Tickets
 
         [Required]
         public string Priority { get; init; } = string.Empty;
-
-        [Required]
-        [MinLength(8)]
-        [MaxLength(8)]
-        public byte[] Version { get; init; } = [];
     }
 
     public class PatchTicketRequest
