@@ -1896,6 +1896,77 @@ public class TicketsEndpointsTests : IAsyncLifetime
         }
     }
 
+    [Fact]
+    public async Task PatchTicket_WithStaleETag_ShouldReturnPreconditionFailed()
+    {
+        var factory = _fixture.Factory;
+        var userId = await SeedUserWithPasswordAsync(factory);
+        var client = factory.CreateClient();
+        await AuthenticateUserAsync(factory, client, userId);
+
+        int ticketId;
+        byte[] oldTicketVersion;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var ticket = new Ticket(
+                "Old Title",
+                "Old Description",
+                TicketPriority.Normal);
+            await context.Tickets.AddAsync(ticket);
+            await context.SaveChangesAsync();
+            ticketId = ticket.Id;
+            oldTicketVersion = ticket.Version;
+        }
+
+        var getResponse = await SendAsync(client, HttpMethod.Get, $"/api/tickets/{ticketId}", null);
+        Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
+        var ticketDetails = await getResponse.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketDetails);
+        Assert.Equal(oldTicketVersion, ticketDetails.Version);
+
+        var patchRequest1 = new PatchTicketRequest
+        {
+            Title = "Another Title",
+            Description = "Another Description",
+            Priority = "Low"
+        };
+
+        var patchResponse1 = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", oldTicketVersion, patchRequest1);
+        Assert.Equal(HttpStatusCode.OK, patchResponse1.StatusCode);
+        var ticketDetailsAfterFirstUpdate = await patchResponse1.Content.ReadFromJsonAsync<TicketDetailsResponse>();
+        Assert.NotNull(ticketDetailsAfterFirstUpdate);
+        var newVersion = ticketDetailsAfterFirstUpdate.Version;
+        Assert.NotEqual(oldTicketVersion, newVersion);
+        Assert.Equal("Another Title", ticketDetailsAfterFirstUpdate.Title);
+        Assert.Equal("Another Description", ticketDetailsAfterFirstUpdate.Description);
+        Assert.Equal("Low", ticketDetailsAfterFirstUpdate.Priority);
+
+        var patchRequest2 = new PatchTicketRequest
+        {
+            Title = "New Title",
+            Description = "New Description",
+            Priority = "High"
+        };
+
+        var patchResponse2 = await SendAsync(client, HttpMethod.Patch, $"/api/tickets/{ticketId}", oldTicketVersion, patchRequest2);
+        Assert.Equal(HttpStatusCode.PreconditionFailed, patchResponse2.StatusCode);
+        var problem = await patchResponse2.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.NotNull(problem.Detail);
+        Assert.Contains("has been modified by another user", problem.Detail);
+        using (var scope = factory.Services.CreateScope())
+        {
+            var context = scope.ServiceProvider.GetRequiredService<HelpDeskDbContext>();
+            var persistedTicket = await context.Tickets.SingleAsync(t => t.Id == ticketId);
+            Assert.NotNull(persistedTicket);
+            Assert.Equal("Another Title", persistedTicket.Title);
+            Assert.Equal("Another Description", persistedTicket.Description);
+            Assert.Equal(TicketPriority.Low, persistedTicket.Priority);
+            Assert.Equal(newVersion, persistedTicket.Version);
+        }
+    }
+
     #endregion
 
     #region GetTickets
